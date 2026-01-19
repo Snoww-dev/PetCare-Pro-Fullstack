@@ -1,0 +1,21 @@
+# Bỏ qua các thư viện nặng (tải lại được bằng npm install)
+node_modules/
+
+# Bỏ qua file môi trường chứa mật khẩu (Quan trọng!)
+.env
+*.env
+
+# Bỏ qua file rác hệ thống
+.DS_Store
+Thumbs.db
+
+# Bỏ qua thư mục build của Expo/Android/iOS
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# Log lỗi
+npm-debug.log*
+yarn-debug.log*
