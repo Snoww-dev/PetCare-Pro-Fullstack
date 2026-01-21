@@ -3,9 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./src/config/database');
 
-// <--- 1. THÊM DÒNG NÀY: Gọi file route vừa tạo vào
+// --- CÁC ROUTE (ĐƯỜNG DẪN) ---
 const authRoutes = require('./src/routes/auth.route');
-const petRoutes = require('./src/routes/pet.route'); // <--- 1. Gọi route Pet vào
+const petRoutes = require('./src/routes/pet.route');
+const uploadRoutes = require('./src/routes/upload.route'); // 👈 MỚI THÊM: Gọi file xử lý upload
 
 // 1. Khởi tạo ứng dụng Express
 const app = express();
@@ -13,16 +14,16 @@ const app = express();
 // 2. Kết nối Database
 connectDB();
 
-// 3. Middlewares
+// 3. Middlewares (Bộ lọc)
 app.use(express.json());
 app.use(cors());
 
-// <--- 2. THÊM DÒNG NÀY: Kích hoạt đường dẫn
-// Nghĩa là: Ai muốn vào các tính năng auth thì phải bắt đầu bằng /api/auth
-app.use('/api/auth', authRoutes);
-app.use('/api/pets', petRoutes); // <--- 2. Kích hoạt đường dẫn /api/pets
+// --- KÍCH HOẠT CÁC ROUTE ---
+app.use('/api/auth', authRoutes);       // Các tính năng Đăng nhập/Đăng ký
+app.use('/api/pets', petRoutes);        // Các tính năng Thú cưng
+app.use('/api/upload', uploadRoutes);   // 👈 MỚI THÊM: Kích hoạt đường dẫn Upload ảnh
 
-// 4. Route test
+// 4. Route test (Kiểm tra server sống hay chết)
 app.get('/', (req, res) => {
     res.send('API Pet Manager đang chạy ngon lành! 🚀');
 });

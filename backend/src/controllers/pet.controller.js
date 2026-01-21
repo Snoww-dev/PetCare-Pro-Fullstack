@@ -91,3 +91,42 @@ exports.updatePet = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật' });
     }
 };
+
+// 5. Thêm hồ sơ sức khỏe (Tiêm chủng/Khám bệnh)
+exports.addMedicalRecord = async (req, res) => {
+    try {
+        const { date, type, title, description, doctor } = req.body;
+
+        // Tìm thú cưng và đẩy dữ liệu mới vào mảng medicalRecords
+        const pet = await Pet.findOneAndUpdate(
+            { _id: req.params.id, owner: req.userId },
+            { 
+                $push: { 
+                    medicalRecords: { date, type, title, description, doctor } 
+                } 
+            },
+            { new: true } // Trả về dữ liệu mới nhất
+        );
+
+        if (!pet) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng!' });
+        }
+
+        res.json({ success: true, message: 'Đã thêm hồ sơ thành công!', data: pet });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi server: ' + error.message });
+    }
+};
+
+// 6. Lấy chi tiết một thú cưng
+exports.getPet = async (req, res) => {
+    try {
+        const pet = await Pet.findOne({ _id: req.params.id, owner: req.userId });
+        if (!pet) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng!' });
+        }
+        res.json({ success: true, data: pet });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};

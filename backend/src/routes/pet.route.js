@@ -8,7 +8,10 @@ const petController = require('../controllers/pet.controller');
 // Các đường dẫn (API)
 router.post('/', authMiddleware, petController.createPet); // Thêm mới
 router.get('/', authMiddleware, petController.getPets);    // Xem danh sách
+router.get('/:id', authMiddleware, petController.getPet);
 router.delete('/:id', authMiddleware, petController.deletePet); // Xóa (Mới thêm)
 router.put('/:id', authMiddleware, petController.updatePet); // Sửa
+// API thêm hồ sơ sức khỏe
+router.post('/:id/medical', authMiddleware, petController.addMedicalRecord);
 
 module.exports = router;
