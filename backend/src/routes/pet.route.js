@@ -7,7 +7,7 @@ const petController = require('../controllers/pet.controller');
 
 // 👇 MỚI THÊM: Import bộ xử lý Upload ảnh và Model Pet
 const uploadCloud = require('../middlewares/uploader');
-const Pet = require('../models/pet.model'); // Đảm bảo tên file model khớp với project của bạn
+const Pet = require('../models/Pet.model.js'); // Đảm bảo tên file model khớp với project của bạn
 
 // --- CÁC ROUTE CƠ BẢN (Dùng Controller) ---
 // Thêm mới Pet (Nếu Pet có ảnh đại diện thì cần thêm uploadCloud vào đây, nhưng tạm thời giữ nguyên theo code cũ của bạn)
