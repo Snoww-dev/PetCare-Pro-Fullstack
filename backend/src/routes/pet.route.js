@@ -5,10 +5,10 @@ const router = express.Router();
 const authMiddleware = require('../middlewares/auth.middleware');
 const petController = require('../controllers/pet.controller');
 
-// 👇 Import "Vận chuyển" (Upload) - TRỎ ĐÚNG FILE VỪA TẠO
+// 👇 Import "Vận chuyển" (Upload)
 const uploadCloud = require('../middlewares/uploader'); 
 
-// 👇 Import Model Pet - TRỎ ĐÚNG TÊN FILE TRONG ẢNH CỦA BẠN (Pet.model.js)
+// 👇 Import Model Pet
 const Pet = require('../models/Pet.model'); 
 
 // --- CÁC ROUTE CƠ BẢN ---
@@ -16,7 +16,9 @@ router.post('/', authMiddleware, petController.createPet);
 router.get('/', authMiddleware, petController.getPets);    
 router.get('/:id', authMiddleware, petController.getPet);
 router.delete('/:id', authMiddleware, petController.deletePet); 
-router.put('/:id', authMiddleware, petController.updatePet); 
+
+// 👇 ĐÃ SỬA: Thêm uploadCloud.single('image') vào đây để nhận ảnh khi chỉnh sửa
+router.put('/:id', authMiddleware, uploadCloud.single('image'), petController.updatePet); 
 
 // --- ROUTE THÊM HỒ SƠ Y TẾ (CÓ ẢNH) ---
 router.post('/:id/medical', authMiddleware, uploadCloud.single('image'), async (req, res) => {
