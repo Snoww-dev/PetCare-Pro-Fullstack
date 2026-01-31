@@ -6,7 +6,7 @@ const connectDB = require('./src/config/database');
 // 👇 1. Import Model Pet (Đưa lên đầu và sửa đường dẫn vào thư mục src)
 // Lưu ý: Kiểm tra file model của bạn tên là 'Pet.js' hay 'pet.model.js' để sửa cho khớp nhé.
 // Ở đây mình giả định là 'pet.model' theo chuẩn chung.
-const Pet = require('./src/models/pet.model'); 
+const Pet = require('./src/models/Pet.model.js'); 
 
 // --- CÁC ROUTE (ĐƯỜNG DẪN) ---
 const authRoutes = require('./src/routes/auth.route');
