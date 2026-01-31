@@ -7,22 +7,23 @@ const petSchema = new mongoose.Schema({
         required: true
     },
     name: { type: String, required: true },
-    species: { type: String, required: true }, // Chó, Mèo...
-    breed: { type: String }, // Giống (Poodle, Corgi...)
+    species: { type: String, required: true },
+    breed: { type: String },
     gender: { type: String, enum: ['male', 'female'], default: 'male' },
     weight: { type: Number, default: 0 },
     birthday: { type: Date },
-    img_url: { type: String }, // Link ảnh
+    img_url: { type: String }, 
     note: { type: String },
     
-    // 👇 THÊM PHẦN NÀY: Hồ sơ sức khỏe (Mảng chứa các mũi tiêm/khám bệnh)
-    medicalRecords: [
+    // 👇 ĐÃ SỬA LẠI TÊN BIẾN THÀNH 'medical_records' (cho khớp với Route)
+    medical_records: [
         {
-            date: { type: Date, default: Date.now }, // Ngày khám/tiêm
-            type: { type: String, enum: ['vaccine', 'checkup', 'surgery'], default: 'vaccine' }, // Loại
-            title: { type: String, required: true }, // Tên mũi tiêm (VD: Dại, 7 bệnh)
-            description: { type: String }, // Ghi chú thêm
-            doctor: { type: String } // Tên bác sĩ/Phòng khám
+            date: { type: String }, // Đổi sang String để dễ lưu dạng YYYY-MM-DD từ App gửi lên
+            type: { type: String, default: 'medical' }, // Bỏ Enum cứng nhắc để tránh lỗi, mặc định là medical
+            title: { type: String, required: true },
+            description: { type: String },
+            doctor: { type: String },
+            img_url: { type: String } // 👈 ĐÃ THÊM: Chỗ để lưu link ảnh X-quang/Đơn thuốc
         }
     ]
 
