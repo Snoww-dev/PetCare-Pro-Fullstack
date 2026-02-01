@@ -14,6 +14,8 @@ const petSchema = new mongoose.Schema({
     birthday: { type: Date },
     img_url: { type: String }, 
     note: { type: String },
+
+    contact_info: { type: String, default: "Xin hãy gọi cho chủ nhân của tôi!" },
     
     // 👇 ĐÃ SỬA LẠI TÊN BIẾN THÀNH 'medical_records' (cho khớp với Route)
     medical_records: [

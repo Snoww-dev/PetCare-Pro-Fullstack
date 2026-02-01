@@ -64,19 +64,19 @@ exports.deletePet = async (req, res) => {
     }
 };
 
-// 👇 4. CẬP NHẬT THÔNG TIN THÚ CƯNG (ĐÃ SỬA LOGIC ẢNH)
+// 👇 4. CẬP NHẬT THÔNG TIN THÚ CƯNG (ĐÃ SỬA ĐỂ LƯU CONTACT_INFO)
 exports.updatePet = async (req, res) => {
   try {
     // Lấy thông tin từ form gửi lên
-    // (Thêm biến note vào để không bị mất ghi chú khi sửa)
-    const { name, species, breed, age, weight, gender, note } = req.body;
-
+    const { name, species, breed, age, weight, gender, note, contact_info } = req.body;
+    
     // Tạo đối tượng chứa dữ liệu cần sửa
     let updateData = {
       name,
       species,
       breed,
       note,
+      contact_info, // 👈 ĐÃ THÊM DÒNG NÀY ĐỂ LƯU THÔNG TIN LIÊN HỆ QR
       age: age ? Number(age) : undefined, // Chỉ update nếu có giá trị
       weight: weight ? Number(weight) : undefined,
       gender
