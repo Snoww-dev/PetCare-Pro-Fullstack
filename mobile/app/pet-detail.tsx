@@ -1,8 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router'; // 👈 Thêm useFocusEffect
-import React, { useCallback, useState } from 'react'; // 👈 Thêm useCallback
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { 
+  ActivityIndicator, 
+  FlatList, 
+  Image, 
+  StyleSheet, 
+  Text, 
+  TouchableOpacity, 
+  View, 
+  Alert // 👈 Đã thêm import Alert
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function PetDetailScreen() {
@@ -11,11 +20,10 @@ export default function PetDetailScreen() {
   const [pet, setPet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Link API
+  // Link API gốc của Pet này
   const API_URL = `https://petcare-api-tuyet.onrender.com/api/pets/${params.id}`;
 
-  // 👇 SỬA ĐOẠN NÀY: Dùng useFocusEffect thay vì useEffect
-  // Giúp tự động tải lại dữ liệu mỗi khi bạn quay lại màn hình này
+  // Tự động tải lại dữ liệu mỗi khi quay lại màn hình này
   useFocusEffect(
     useCallback(() => {
       fetchPetDetail();
@@ -36,25 +44,88 @@ export default function PetDetailScreen() {
     }
   };
 
+  // 👇 HÀM XỬ LÝ XÓA BỆNH ÁN
+  const handleDeleteRecord = async (recordId: string) => {
+    Alert.alert("Xóa hồ sơ", "Bạn chắc chắn muốn xóa dòng lịch sử này chứ?", [
+        { text: "Hủy", style: "cancel" },
+        {
+            text: "Xóa", style: "destructive", onPress: async () => {
+                try {
+                    const token = await AsyncStorage.getItem('token');
+                    // Gọi API Delete: /api/pets/:petId/medical/:recordId
+                    await axios.delete(`${API_URL}/medical/${recordId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    
+                    // Xóa xong thì load lại dữ liệu để cập nhật danh sách
+                    fetchPetDetail(); 
+                    Alert.alert("Thành công", "Đã xóa bản ghi.");
+                } catch (error) {
+                    console.log(error);
+                    Alert.alert("Lỗi", "Không xóa được lúc này.");
+                }
+            }
+        }
+    ]);
+  };
+
+  // 👇 GIAO DIỆN MỘT DÒNG LỊCH SỬ KHÁM (ĐÃ CẬP NHẬT)
   const renderMedicalRecord = ({ item }: any) => (
     <View style={styles.timelineItem}>
-      <View style={styles.timelineDot} />
-      <View style={styles.timelineLine} />
-      <View style={styles.recordCard}>
-        <Text style={styles.recordDate}>{new Date(item.date).toLocaleDateString('vi-VN')}</Text>
-        <Text style={styles.recordTitle}>{item.title} ({item.type === 'vaccine' ? '💉' : '🏥'})</Text>
-        
-        {item.description ? <Text style={styles.recordDesc}>{item.description}</Text> : null}
-        {item.doctor ? <Text style={styles.recordDoctor}>👨‍⚕️ {item.doctor}</Text> : null}
+        <View style={styles.timelineDot} />
+        <View style={styles.timelineLine} />
+        <View style={styles.recordCard}>
+            
+            {/* Hàng tiêu đề + Nút thao tác */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.recordDate}>{new Date(item.date).toLocaleDateString('vi-VN')}</Text>
+                    <Text style={styles.recordTitle}>{item.title} ({item.type === 'vaccine' ? '💉' : '🏥'})</Text>
+                </View>
 
-        {/* HIỂN THỊ ẢNH NẾU CÓ */}
-        {item.img_url ? (
-          <Image 
-            source={{ uri: item.img_url }} 
-            style={{ width: '100%', height: 150, borderRadius: 10, marginTop: 10, resizeMode: 'cover' }} 
-          />
-        ) : null}
-      </View>
+                {/* Khu vực nút Sửa & Xóa */}
+                <View style={{ flexDirection: 'row' }}>
+                    <TouchableOpacity 
+                        style={{ padding: 5, marginRight: 5 }}
+                        onPress={() => router.push({
+                            pathname: '/edit-medical',
+                            params: { 
+                                petId: pet._id, 
+                                recordId: item._id, 
+                                // Truyền dữ liệu cũ sang màn hình sửa
+                                oldData: JSON.stringify(item) 
+                            }
+                        } as any)}
+                    >
+                        <Text style={{fontSize: 18}}>✏️</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={{ padding: 5 }} onPress={() => handleDeleteRecord(item._id)}>
+                        <Text style={{fontSize: 18}}>🗑️</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {item.description ? <Text style={styles.recordDesc}>{item.description}</Text> : null}
+            {item.doctor ? <Text style={styles.recordDoctor}>👨‍⚕️ {item.doctor}</Text> : null}
+
+            {/* 👇 HIỂN THỊ NGÀY TÁI KHÁM (NẾU CÓ) */}
+            {item.next_appointment ? (
+                <View style={{ marginTop: 8, backgroundColor: '#FFF0F3', padding: 8, borderRadius: 8 }}>
+                    <Text style={{ color: '#FF6B81', fontWeight: 'bold', fontSize: 12 }}>
+                        ⏰ Lịch tái khám: {new Date(item.next_appointment).toLocaleDateString('vi-VN')}
+                    </Text>
+                </View>
+            ) : null}
+
+            {/* HIỂN THỊ ẢNH NẾU CÓ */}
+            {item.img_url ? (
+              <Image 
+                source={{ uri: item.img_url }} 
+                style={{ width: '100%', height: 150, borderRadius: 10, marginTop: 10, resizeMode: 'cover' }} 
+              />
+            ) : null}
+        </View>
     </View>
   );
 
@@ -90,7 +161,7 @@ export default function PetDetailScreen() {
             <Text style={styles.btnLabel}>Lấy mã QR</Text>
         </TouchableOpacity>
 
-        {/* Nút Chỉnh sửa */}
+        {/* Nút Chỉnh sửa Pet */}
         <TouchableOpacity 
             style={[styles.actionBtn, {flex: 1.5}]} 
             onPress={() => router.push({ pathname: '/edit-pet', params: { id: pet._id } } as any)}

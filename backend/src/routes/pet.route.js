@@ -53,4 +53,10 @@ router.post('/:id/medical', authMiddleware, uploadCloud.single('image'), async (
   }
 });
 
+// API Sửa bệnh án (Có upload ảnh nếu cần)
+router.put('/:petId/medical/:recordId', authMiddleware, uploadCloud.single('image'), petController.updateMedicalRecord);
+
+// API Xóa bệnh án
+router.delete('/:petId/medical/:recordId', authMiddleware, petController.deleteMedicalRecord);
+
 module.exports = router;

@@ -25,7 +25,13 @@ const petSchema = new mongoose.Schema({
             title: { type: String, required: true },
             description: { type: String },
             doctor: { type: String },
-            img_url: { type: String } // 👈 ĐÃ THÊM: Chỗ để lưu link ảnh X-quang/Đơn thuốc
+            
+            // 👇 Chỗ để lưu link ảnh X-quang/Đơn thuốc. 
+            // ⚠️ QUAN TRỌNG: Nhớ có dấu phẩy ở cuối dòng này nhé
+            img_url: { type: String }, 
+
+            // 👇 Dòng bạn mới thêm để lưu ngày tái khám
+            next_appointment: { type: String } 
         }
     ]
 

@@ -147,3 +147,57 @@ exports.getPet = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
+
+// 7. Sửa một dòng trong sổ khám bệnh
+exports.updateMedicalRecord = async (req, res) => {
+    try {
+        const { petId, recordId } = req.params;
+        const { date, title, description, doctor, next_appointment } = req.body; // Thêm next_appointment
+
+        // Tạo object chứa dữ liệu cần sửa
+        // Lưu ý: MongoDB update trong mảng dùng cú pháp "medical_records.$.field"
+        let updateFields = {
+            "medical_records.$.date": date,
+            "medical_records.$.title": title,
+            "medical_records.$.description": description,
+            "medical_records.$.doctor": doctor,
+            "medical_records.$.next_appointment": next_appointment // 👈 Logic mới: Ngày tái khám
+        };
+
+        // Nếu có up ảnh mới thì sửa luôn ảnh
+        if (req.file) {
+            updateFields["medical_records.$.img_url"] = req.file.path;
+        }
+
+        const pet = await Pet.findOneAndUpdate(
+            { _id: petId, "medical_records._id": recordId, owner: req.userId },
+            { $set: updateFields },
+            { new: true }
+        );
+
+        if (!pet) return res.status(404).json({ success: false, message: 'Không tìm thấy bản ghi!' });
+
+        res.json({ success: true, message: 'Cập nhật thành công!', data: pet });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi update medical: ' + error.message });
+    }
+};
+
+// 8. Xóa một dòng trong sổ khám bệnh
+exports.deleteMedicalRecord = async (req, res) => {
+    try {
+        const { petId, recordId } = req.params;
+
+        const pet = await Pet.findOneAndUpdate(
+            { _id: petId, owner: req.userId },
+            { $pull: { medical_records: { _id: recordId } } }, // $pull là lệnh xóa phần tử khỏi mảng
+            { new: true }
+        );
+
+        if (!pet) return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng!' });
+
+        res.json({ success: true, message: 'Đã xóa hồ sơ!' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi xóa medical: ' + error.message });
+    }
+};
