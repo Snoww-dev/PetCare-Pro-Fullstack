@@ -18,90 +18,121 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
-// 👇 1. IMPORT THƯ VIỆN THÔNG BÁO & ICON
 import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker'; // 👈 Cần cài thư viện này
 
 export default function AddMedicalScreen() {
   const { petId } = useLocalSearchParams();
   const router = useRouter();
 
-  const today = new Date().toISOString().split('T')[0];
-  const [date, setDate] = useState(today);
+  // Mặc định ngày hiện tại
+  const todayRaw = new Date();
+  const todayStr = todayRaw.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  const [date, setDate] = useState(todayStr);
+  const [nextDate, setNextDate] = useState(''); 
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [doctor, setDoctor] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Link API
+  // Quản lý ẩn/hiện lịch
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showNextDatePicker, setShowNextDatePicker] = useState(false);
+
   const API_URL = `https://petcare-api-tuyet.onrender.com/api/pets/${petId}/medical`;
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      // 👇 SỬA LỖI 1: Dùng MediaTypeOptions cho chắc ăn
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
+  // 👇 HÀM THÔNG MINH: CHUYỂN MỌI ĐỊNH DẠNG VỀ YYYY-MM-DD
+  const parseDateInput = (inputDate: string) => {
+      if (!inputDate) return null;
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      // 1. Thay tất cả dấu / hoặc . thành dấu -
+      let normalized = inputDate.replace(/[\/\.]/g, '-');
+      
+      // 2. Tách chuỗi
+      const parts = normalized.split('-');
+
+      // Trường hợp 1: Nhập đúng chuẩn YYYY-MM-DD (2026-05-02)
+      if (parts[0].length === 4 && parts.length === 3) return normalized;
+
+      // Trường hợp 2: Nhập kiểu Việt Nam D-M-YYYY hoặc DD-MM-YYYY (2-5-2026)
+      if (parts.length === 3 && parts[2].length === 4) {
+          const day = parts[0].padStart(2, '0');   // Thêm số 0 nếu thiếu (2 -> 02)
+          const month = parts[1].padStart(2, '0'); // (5 -> 05)
+          const year = parts[2];
+          return `${year}-${month}-${day}`;
+      }
+
+      return null; // Không hiểu định dạng
+  };
+
+  // Chọn ngày từ Lịch (Ngày khám)
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setDate(selectedDate.toISOString().split('T')[0]);
     }
   };
 
-  // 👇 HÀM PHỤ TRỢ: LÊN LỊCH THÔNG BÁO
-  const scheduleReminder = async (recordTitle: string, recordDate: Date) => {
-    console.log("--- Bắt đầu đặt lịch ---");
-    try {
-      // 1. Xin quyền thông báo
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Lỗi', 'Bạn chưa cấp quyền thông báo cho App!');
-        return;
-      }
-
-      // 2. Tạo kênh thông báo (Bắt buộc cho Android)
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
-        });
-      }
-
-      // 3. Cấu hình thời gian: 8:00 SÁNG ngày hẹn
-      const triggerDate = new Date(recordDate);
-      triggerDate.setHours(8, 0, 0, 0); 
-
-      // Kiểm tra nếu 8h sáng ngày đó đã qua
-      if (triggerDate <= new Date()) {
-         console.log("Đã qua 8h sáng ngày hẹn, không đặt lịch.");
-         return; 
-      }
-      
-      console.log("Đang lên lịch vào lúc:", triggerDate);
-
-      // 4. Lên lịch
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "🗓️ Nhắc nhở lịch thú cưng",
-          body: `Hôm nay bé có lịch: ${recordTitle}. Đừng quên nhé!`,
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        // 👇 SỬA LỖI 2: Thêm 'as any' để TypeScript không báo lỗi dòng này nữa
-        trigger: triggerDate as any, 
-      });
-
-      console.log("Đã lên lịch thành công!");
-      Alert.alert("Đã đặt lịch! ⏰", "App sẽ nhắc bạn vào 8:00 sáng ngày hẹn.");
-      
-    } catch (error) {
-      console.log("Lỗi đặt lịch:", error);
-      Alert.alert("Lỗi", "Có lỗi khi đặt lịch: " + error);
+  // Chọn ngày từ Lịch (Tái khám)
+  const onNextDateChange = (event: any, selectedDate?: Date) => {
+    setShowNextDatePicker(false);
+    if (selectedDate) {
+      setNextDate(selectedDate.toISOString().split('T')[0]);
     }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, quality: 1,
+    });
+    if (!result.canceled) setImage(result.assets[0].uri);
+  };
+
+  // Logic đặt lịch (Dùng số giây để tránh lỗi Android)
+  const scheduleNextAppointment = async (validNextDateString: string) => {
+    const parts = validNextDateString.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; 
+    const day = parseInt(parts[2]);
+
+    const triggerDate = new Date(year, month, day, 8, 0, 0); // 8h sáng
+    const now = new Date();
+    const diffInSeconds = Math.floor((triggerDate.getTime() - now.getTime()) / 1000);
+
+    if (isNaN(diffInSeconds) || diffInSeconds <= 0) {
+        Alert.alert("Lỗi", "Ngày tái khám phải là ngày trong tương lai!");
+        return;
+    }
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🔔 NHẮC LỊCH TÁI KHÁM",
+        body: `Hôm nay đến hẹn TÁI KHÁM cho bé (Vấn đề: ${title}). Bố/Mẹ nhớ đưa bé đi nhé!`,
+        sound: true,
+      },
+      trigger: {
+          seconds: diffInSeconds,
+          repeats: false,
+          channelId: 'default',
+      },
+    });
+    
+    const daysLeft = Math.ceil(diffInSeconds / (3600 * 24));
+    Alert.alert("Đã đặt lịch! 🔔", `App sẽ nhắc bạn sau khoảng ${daysLeft} ngày nữa (vào sáng ngày ${day}/${month + 1}/${year}).`);
   };
 
   const handleAddRecord = async () => {
@@ -110,47 +141,53 @@ export default function AddMedicalScreen() {
       return;
     }
 
+    // 👇 BƯỚC QUAN TRỌNG: CHUẨN HÓA NGÀY TRƯỚC KHI GỬI
+    const finalDate = parseDateInput(date);
+    const finalNextDate = parseDateInput(nextDate);
+
+    if (!finalDate) {
+        Alert.alert("Lỗi ngày khám", "Ngày khám không hợp lệ. Vui lòng nhập kiểu ngày-tháng-năm (VD: 02-05-2026)");
+        return;
+    }
+    
+    // Nếu có nhập ngày tái khám nhưng sai định dạng
+    if (nextDate && !finalNextDate) {
+        Alert.alert("Lỗi ngày tái khám", "Ngày tái khám không hợp lệ. Vui lòng nhập kiểu ngày-tháng-năm (VD: 10-05-2026)");
+        return;
+    }
+
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
-      
       const formData = new FormData();
-      formData.append('date', date);
+      
+      formData.append('date', finalDate); // Gửi ngày chuẩn YYYY-MM-DD
       formData.append('title', title);
       formData.append('description', description);
       formData.append('doctor', doctor);
       formData.append('type', 'medical');
 
+      if (finalNextDate) {
+          formData.append('next_appointment', finalNextDate);
+      }
+
       if (image) {
         // @ts-ignore
-        formData.append('image', {
-          uri: image,
-          type: 'image/jpeg',
-          name: 'medical-record.jpg',
-        });
+        formData.append('image', { uri: image, type: 'image/jpeg', name: 'medical-record.jpg' });
       }
       
       await axios.post(API_URL, formData, {
-        headers: { 
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}` 
-        }
+        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
       });
 
-      // 👇 LOGIC HỎI NHẮC NHỞ
-      const recordDate = new Date(date);
-      const now = new Date();
-      
-      if (recordDate > now) {
+      if (finalNextDate) {
         Alert.alert(
           "Đã lưu hồ sơ! ✅",
-          "Đây là lịch hẹn trong tương lai. Bạn có muốn App nhắc nhở vào sáng ngày đó không?",
+          "Bạn có muốn App nhắc nhở vào sáng ngày TÁI KHÁM không?",
           [
             { text: "Không cần", style: "cancel", onPress: () => router.back() },
-            { 
-              text: "Có, nhắc tôi!", 
-              onPress: async () => {
-                await scheduleReminder(title, recordDate);
+            { text: "Có, nhắc tôi!", onPress: async () => {
+                await scheduleNextAppointment(finalNextDate);
                 router.back();
               } 
             }
@@ -162,7 +199,7 @@ export default function AddMedicalScreen() {
       }
 
     } catch (error) {
-      console.log('Lỗi thêm medical:', error);
+      console.log('Lỗi:', error);
       Alert.alert('Lỗi', 'Không thể lưu hồ sơ lúc này.');
     } finally {
       setLoading(false);
@@ -182,10 +219,8 @@ export default function AddMedicalScreen() {
 
       <Animatable.View animation="fadeInUp" duration={800} style={styles.formContainer}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          
           <Text style={styles.instruction}>Lưu giữ đơn thuốc, lịch tiêm hoặc hình ảnh X-quang.</Text>
 
-          {/* Chọn ảnh */}
           <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
             {image ? (
               <Image source={{ uri: image }} style={styles.previewImage} />
@@ -197,29 +232,59 @@ export default function AddMedicalScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Form nhập liệu */}
           <Text style={styles.label}>Tiêu đề (*)</Text>
-          <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Ví dụ: Tiêm phòng dại, Khám da liễu..." />
+          <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Ví dụ: Tiêm phòng dại..." />
 
           <View style={styles.row}>
+            {/* NGÀY KHÁM */}
             <View style={{flex: 1, marginRight: 10}}>
-                <Text style={styles.label}>Ngày khám (YYYY-MM-DD)</Text>
-                <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
+                <Text style={styles.label}>Ngày khám</Text>
+                <View style={styles.dateInputContainer}>
+                    <TextInput 
+                        style={styles.dateInputText} 
+                        value={date} 
+                        onChangeText={setDate} 
+                        placeholder="DD-MM-YYYY" 
+                    />
+                    <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                        <Ionicons name="calendar-outline" size={24} color="#FF6B81" />
+                    </TouchableOpacity>
+                </View>
+                {showDatePicker && (
+                    <DateTimePicker value={new Date()} mode="date" display="default" onChange={onDateChange} />
+                )}
             </View>
+
+            {/* NGÀY TÁI KHÁM */}
             <View style={{flex: 1}}>
-                <Text style={styles.label}>Bác sĩ / Nơi khám</Text>
-                <TextInput style={styles.input} value={doctor} onChangeText={setDoctor} placeholder="BS. Nam / PetMart" />
+                <Text style={[styles.label, {color: '#FF6B81'}]}>Ngày tái khám (?)</Text>
+                <View style={[styles.dateInputContainer, {borderColor: '#FF6B81'}]}>
+                    <TextInput 
+                        style={styles.dateInputText} 
+                        value={nextDate} 
+                        onChangeText={setNextDate} 
+                        placeholder="DD-MM-YYYY" 
+                    />
+                    <TouchableOpacity onPress={() => setShowNextDatePicker(true)}>
+                        <Ionicons name="alarm-outline" size={24} color="#FF6B81" />
+                    </TouchableOpacity>
+                </View>
+                {showNextDatePicker && (
+                    <DateTimePicker value={new Date()} mode="date" display="default" onChange={onNextDateChange} minimumDate={new Date()} />
+                )}
             </View>
           </View>
+
+          <Text style={styles.label}>Bác sĩ / Nơi khám</Text>
+          <TextInput style={styles.input} value={doctor} onChangeText={setDoctor} placeholder="BS. Nam / PetMart" />
 
           <Text style={styles.label}>Chi tiết / Chẩn đoán (*)</Text>
           <TextInput 
             style={[styles.input, styles.textArea]} 
             value={description} 
             onChangeText={setDescription}
-            placeholder="Ghi chú chi tiết về bệnh tình hoặc loại thuốc..."
+            placeholder="Ghi chú bệnh tình..."
             multiline={true}
-            numberOfLines={4}
             textAlignVertical="top"
           />
 
@@ -241,23 +306,20 @@ const styles = StyleSheet.create({
   header: { marginTop: 50, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' },
   backBtn: { backgroundColor: '#fff', padding: 10, borderRadius: 15, marginRight: 15, elevation: 5 },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
-
   formContainer: { flex: 1, backgroundColor: '#fff', marginTop: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, elevation: 10 },
   instruction: { textAlign: 'center', color: '#888', marginBottom: 20, fontStyle: 'italic' },
-
-  imagePicker: {
-    height: 150, width: '100%', backgroundColor: '#FFF0F3',
-    borderRadius: 15, borderStyle: 'dashed', borderWidth: 2, borderColor: '#FF9A9E',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 20, overflow: 'hidden'
-  },
+  imagePicker: { height: 150, width: '100%', backgroundColor: '#FFF0F3', borderRadius: 15, borderStyle: 'dashed', borderWidth: 2, borderColor: '#FF9A9E', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   previewImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   placeholder: { alignItems: 'center' },
-
   label: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 5, marginTop: 10 },
   input: { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 12, padding: 12, fontSize: 16, color: '#333' },
+  
+  // Style riêng cho ô nhập ngày (Kết hợp input + icon)
+  dateInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
+  dateInputText: { flex: 1, fontSize: 16, color: '#333', paddingVertical: 4 },
+
   textArea: { height: 100 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
-
   submitBtn: { padding: 18, borderRadius: 15, alignItems: 'center', shadowColor: '#FF6B81', shadowOpacity: 0.3, elevation: 5 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });

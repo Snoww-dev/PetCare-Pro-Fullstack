@@ -23,7 +23,8 @@ router.put('/:id', authMiddleware, uploadCloud.single('image'), petController.up
 // --- ROUTE THÊM HỒ SƠ Y TẾ (CÓ ẢNH) ---
 router.post('/:id/medical', authMiddleware, uploadCloud.single('image'), async (req, res) => {
   try {
-    const { date, title, description, doctor, type } = req.body;
+    // 👇 ĐÃ SỬA: Thêm 'next_appointment' vào danh sách nhận dữ liệu
+    const { date, title, description, doctor, type, next_appointment } = req.body;
     
     // Lấy link ảnh nếu có
     const img_url = req.file ? req.file.path : '';
@@ -34,7 +35,10 @@ router.post('/:id/medical', authMiddleware, uploadCloud.single('image'), async (
       description,
       doctor,
       type: type || 'medical',
-      img_url
+      img_url,
+      
+      // 👇 ĐÃ SỬA: Lưu ngày tái khám vào Database
+      next_appointment: next_appointment || null 
     };
 
     const pet = await Pet.findByIdAndUpdate(

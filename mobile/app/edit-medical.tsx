@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform
 } from 'react-native';
@@ -9,26 +9,67 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications'; // Dùng lại thư viện thông báo
+import * as Notifications from 'expo-notifications'; 
+import DateTimePicker from '@react-native-community/datetimepicker'; // 👈 Import DatePicker
 
 export default function EditMedicalScreen() {
   const { petId, recordId, oldData } = useLocalSearchParams();
   const router = useRouter();
   
-  // Parse dữ liệu cũ
+  // Parse dữ liệu cũ được truyền sang
   const parsedData = oldData ? JSON.parse(oldData as string) : {};
 
-  const [date, setDate] = useState(parsedData.date || '');
+  // Hàm xử lý ngày cũ (để tránh lỗi hiển thị)
+  const initDate = (val: string) => {
+      if (!val) return '';
+      // Nếu dữ liệu cũ có dạng ISO (2026-05-02T00:00...) thì cắt lấy phần ngày
+      return val.includes('T') ? val.split('T')[0] : val; 
+  };
+
+  const [date, setDate] = useState(initDate(parsedData.date));
   const [title, setTitle] = useState(parsedData.title || '');
   const [description, setDescription] = useState(parsedData.description || '');
   const [doctor, setDoctor] = useState(parsedData.doctor || '');
-  const [nextDate, setNextDate] = useState(parsedData.next_appointment ? parsedData.next_appointment.split('T')[0] : '');
+  const [nextDate, setNextDate] = useState(initDate(parsedData.next_appointment)); // 👇 Lấy ngày tái khám cũ
   
-  const [image, setImage] = useState<string | null>(null); // Ảnh mới
-  const [currentImage, setCurrentImage] = useState(parsedData.img_url || null); // Ảnh cũ
+  const [image, setImage] = useState<string | null>(null);
+  const [currentImage, setCurrentImage] = useState(parsedData.img_url || null);
   const [loading, setLoading] = useState(false);
 
+  // Quản lý hiển thị lịch
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showNextDatePicker, setShowNextDatePicker] = useState(false);
+
   const API_URL = `https://petcare-api-tuyet.onrender.com/api/pets/${petId}/medical/${recordId}`;
+
+  // 👇 HÀM CHUYỂN ĐỔI NGÀY THÔNG MINH (Giống bên AddMedical)
+  const parseDateInput = (inputDate: string) => {
+      if (!inputDate) return null;
+      let normalized = inputDate.replace(/[\/\.]/g, '-');
+      const parts = normalized.split('-');
+
+      if (parts[0].length === 4 && parts.length === 3) return normalized; // YYYY-MM-DD
+
+      if (parts.length === 3 && parts[2].length === 4) { // DD-MM-YYYY
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2];
+          return `${year}-${month}-${day}`;
+      }
+      return null;
+  };
+
+  // Chọn ngày khám từ lịch
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) setDate(selectedDate.toISOString().split('T')[0]);
+  };
+
+  // Chọn ngày tái khám từ lịch
+  const onNextDateChange = (event: any, selectedDate?: Date) => {
+    setShowNextDatePicker(false);
+    if (selectedDate) setNextDate(selectedDate.toISOString().split('T')[0]);
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -38,39 +79,77 @@ export default function EditMedicalScreen() {
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // Hàm nhắc nhở lịch tái khám (Logic thông minh hơn)
-  const scheduleNextAppointment = async () => {
-      if(!nextDate) return;
-      
-      const triggerDate = new Date(nextDate);
-      triggerDate.setHours(8, 0, 0, 0); // Nhắc lúc 8h sáng ngày tái khám
+  // Logic đặt lịch (Dùng số giây)
+  const scheduleNextAppointment = async (validNextDateString: string) => {
+      const parts = validNextDateString.split('-'); 
+      const year = parseInt(parts[0]);
+      const month = parseInt(parts[1]) - 1; 
+      const day = parseInt(parts[2]);
 
-      if (triggerDate <= new Date()) return;
+      const triggerDate = new Date(year, month, day, 8, 0, 0); // 8h sáng
+      const now = new Date();
+      const diffInSeconds = Math.floor((triggerDate.getTime() - now.getTime()) / 1000);
+
+      if (isNaN(diffInSeconds) || diffInSeconds <= 0) {
+          Alert.alert("Lỗi", "Ngày tái khám phải là tương lai!");
+          return;
+      }
+
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+        });
+      }
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "⏰ Nhắc lịch tái khám",
-          body: `Hôm nay là ngày tái khám cho: ${title}. Đừng quên nhé!`,
+          title: "🔔 NHẮC LỊCH TÁI KHÁM", 
+          body: `Hôm nay đến hẹn TÁI KHÁM cho bé (Vấn đề: ${title}). Bố/Mẹ nhớ đưa bé đi nhé!`,
           sound: true,
         },
-        trigger: triggerDate as any,
+        trigger: {
+            seconds: diffInSeconds,
+            repeats: false,
+            channelId: 'default',
+        },
       });
       
-      Alert.alert("Đã đặt lịch! 🔔", "App sẽ nhắc bạn đi tái khám vào 8h sáng ngày đó.");
+      const daysLeft = Math.ceil(diffInSeconds / (3600 * 24));
+      Alert.alert("Đã đặt lịch! 🔔", `App sẽ nhắc bạn sau khoảng ${daysLeft} ngày nữa (vào sáng ngày ${day}/${month + 1}/${year}).`);
   };
 
   const handleUpdate = async () => {
+    // Chuẩn hóa ngày trước khi gửi
+    const finalDate = parseDateInput(date);
+    const finalNextDate = parseDateInput(nextDate);
+
+    if (!finalDate) {
+        Alert.alert("Lỗi ngày khám", "Định dạng ngày không hợp lệ (VD: 02-05-2026)");
+        return;
+    }
+    if (nextDate && !finalNextDate) {
+        Alert.alert("Lỗi ngày tái khám", "Định dạng ngày không hợp lệ (VD: 10-05-2026)");
+        return;
+    }
+
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
       const formData = new FormData();
-      formData.append('date', date);
+      formData.append('date', finalDate);
       formData.append('title', title);
       formData.append('description', description);
       formData.append('doctor', doctor);
       
-      // Gửi thêm ngày tái khám
-      if(nextDate) formData.append('next_appointment', nextDate);
+      if(finalNextDate) {
+          formData.append('next_appointment', finalNextDate);
+      } else {
+          // Nếu xóa trắng ô ngày tái khám -> Gửi chuỗi rỗng để xóa trên server
+          formData.append('next_appointment', ''); 
+      }
 
       if (image) {
         // @ts-ignore
@@ -81,12 +160,11 @@ export default function EditMedicalScreen() {
         headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
       });
 
-      // Nếu có nhập ngày tái khám, hỏi user có muốn đặt chuông không
-      if(nextDate) {
-          Alert.alert("Lịch tái khám", "Bạn có muốn App nhắc nhở vào ngày tái khám không?", [
+      if(finalNextDate) {
+          Alert.alert("Lịch tái khám", "Bạn có muốn cập nhật lời nhắc cho ngày mới này không?", [
               { text: "Không", onPress: () => router.back() },
               { text: "Có, nhắc tôi", onPress: async () => {
-                  await scheduleNextAppointment();
+                  await scheduleNextAppointment(finalNextDate);
                   router.back();
               }}
           ]);
@@ -96,6 +174,7 @@ export default function EditMedicalScreen() {
       }
 
     } catch (error) {
+      console.log(error);
       Alert.alert('Lỗi', 'Không cập nhật được.');
     } finally {
       setLoading(false);
@@ -122,21 +201,37 @@ export default function EditMedicalScreen() {
             <TextInput style={styles.input} value={title} onChangeText={setTitle} />
 
             <View style={{flexDirection: 'row', gap: 10}}>
+                {/* NGÀY KHÁM */}
                 <View style={{flex: 1}}>
                     <Text style={styles.label}>Ngày khám</Text>
-                    <TextInput style={styles.input} value={date} onChangeText={setDate} />
+                    <View style={styles.dateInputContainer}>
+                        <TextInput style={styles.dateInputText} value={date} onChangeText={setDate} placeholder="DD-MM-YYYY" />
+                        <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+                            <Ionicons name="calendar-outline" size={24} color="#FF6B81" />
+                        </TouchableOpacity>
+                    </View>
+                    {showDatePicker && (
+                        <DateTimePicker value={new Date()} mode="date" display="default" onChange={onDateChange} />
+                    )}
                 </View>
+
+                {/* NGÀY TÁI KHÁM */}
                 <View style={{flex: 1}}>
-                     {/* 👇 LOGIC MỚI: NGÀY TÁI KHÁM */}
                     <Text style={[styles.label, {color: '#FF6B81'}]}>Ngày tái khám (?)</Text>
-                    <TextInput 
-                        style={[styles.input, {borderColor: '#FF6B81', borderWidth: 1}]} 
-                        value={nextDate} 
-                        onChangeText={setNextDate} 
-                        placeholder="YYYY-MM-DD"
-                    />
+                    <View style={[styles.dateInputContainer, {borderColor: '#FF6B81'}]}>
+                        <TextInput style={styles.dateInputText} value={nextDate} onChangeText={setNextDate} placeholder="DD-MM-YYYY" />
+                        <TouchableOpacity onPress={() => setShowNextDatePicker(true)}>
+                            <Ionicons name="alarm-outline" size={24} color="#FF6B81" />
+                        </TouchableOpacity>
+                    </View>
+                    {showNextDatePicker && (
+                        <DateTimePicker value={new Date()} mode="date" display="default" onChange={onNextDateChange} minimumDate={new Date()} />
+                    )}
                 </View>
             </View>
+
+            <Text style={styles.label}>Bác sĩ / Nơi khám</Text>
+            <TextInput style={styles.input} value={doctor} onChangeText={setDoctor} />
 
             <Text style={styles.label}>Chi tiết</Text>
             <TextInput style={[styles.input, {height: 80}]} multiline value={description} onChangeText={setDescription} />
@@ -162,5 +257,10 @@ const styles = StyleSheet.create({
   imagePicker: { height: 120, width: '100%', backgroundColor: '#FFF0F3', marginBottom: 20, borderRadius: 10, overflow: 'hidden' },
   label: { fontWeight: 'bold', color: '#555', marginBottom: 5, marginTop: 10 },
   input: { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 10, padding: 10 },
+  
+  // Style ô ngày tháng
+  dateInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  dateInputText: { flex: 1, paddingVertical: 5, color: '#333' },
+
   submitBtn: { padding: 15, borderRadius: 15, alignItems: 'center' }
 });
