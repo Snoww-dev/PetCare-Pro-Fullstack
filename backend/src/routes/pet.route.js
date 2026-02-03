@@ -57,6 +57,30 @@ router.post('/:id/medical', authMiddleware, uploadCloud.single('image'), async (
   }
 });
 
+// --- 👇 ROUTE MỚI: THÊM ẢNH VÀO BỘ SƯU TẬP (GALLERY) ---
+router.post('/:id/gallery', authMiddleware, uploadCloud.single('image'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Chưa chọn ảnh' });
+
+        const newImage = {
+            img_url: req.file.path,
+            date: new Date(),
+            caption: req.body.caption || ''
+        };
+
+        const pet = await Pet.findByIdAndUpdate(
+            req.params.id,
+            { $push: { gallery: newImage } }, // Đẩy ảnh vào mảng gallery
+            { new: true }
+        );
+
+        res.json({ success: true, data: pet });
+    } catch (error) {
+        console.error("Gallery upload error:", error);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+});
+
 // API Sửa bệnh án (Có upload ảnh nếu cần)
 router.put('/:petId/medical/:recordId', authMiddleware, uploadCloud.single('image'), petController.updateMedicalRecord);
 

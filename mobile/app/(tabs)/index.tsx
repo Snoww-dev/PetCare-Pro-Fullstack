@@ -134,14 +134,19 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* 👇 Header đã được dọn dẹp sạch sẽ */}
       <LinearGradient
         colors={['#FF9A9E', '#FECFEF']} 
         start={{x: 0, y: 0}} end={{x: 1, y: 0}}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>Thú Cưng 🐾</Text>
-        {/* Đã xóa các nút chức năng ở đây */}
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Text style={styles.headerTitle}>Thú Cưng </Text>
+            {/* 👇 ĐÃ SỬA: Dùng ../../ để lùi ra đúng thư mục assets */}
+            <Image 
+                source={require('../../assets/images/logo-home.png')} 
+                style={{ width: 32, height: 32, marginLeft: 5, resizeMode: 'contain' }} 
+            />
+        </View>
       </LinearGradient>
 
       {/* Thanh tìm kiếm */}
@@ -190,7 +195,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF0F3' },
   header: {
     paddingTop: 50, paddingBottom: 20, paddingHorizontal: 20,
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', // Đã sửa thành Center cho tiêu đề nằm giữa
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', 
     borderBottomLeftRadius: 25, borderBottomRightRadius: 25, elevation: 5,
   },
   headerTitle: { fontSize: 26, fontWeight: 'bold', color: '#fff', textShadowColor: 'rgba(0,0,0,0.1)', textShadowRadius: 5 },

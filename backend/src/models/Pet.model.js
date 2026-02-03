@@ -15,6 +15,15 @@ const petSchema = new mongoose.Schema({
     img_url: { type: String }, 
     note: { type: String },
 
+    // 👇 THÊM MỚI: Mảng chứa bộ sưu tập ảnh (Growth Timeline)
+    gallery: [
+        {
+            img_url: { type: String, required: true },
+            date: { type: Date, default: Date.now },
+            caption: { type: String } // Ví dụ: "Lần đầu đi tắm", "Sinh nhật 1 tuổi"
+        }
+    ],
+
     contact_info: { type: String, default: "Xin hãy gọi cho chủ nhân của tôi!" },
     
     // 👇 ĐÃ SỬA LẠI TÊN BIẾN THÀNH 'medical_records' (cho khớp với Route)

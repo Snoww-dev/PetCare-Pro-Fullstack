@@ -186,7 +186,7 @@ export default function EditMedicalScreen() {
       <LinearGradient colors={['#FF9A9E', '#FECFEF']} style={styles.headerBackground} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={24} color="#FF6B81" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>Sửa Hồ Sơ</Text>
+        <Text style={styles.headerTitle}>Sửa Lịch Khám</Text>
       </View>
 
       <Animatable.View animation="fadeInUp" style={styles.formContainer}>

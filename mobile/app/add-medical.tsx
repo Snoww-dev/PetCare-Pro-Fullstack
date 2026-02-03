@@ -20,13 +20,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker'; // 👈 Cần cài thư viện này
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function AddMedicalScreen() {
   const { petId } = useLocalSearchParams();
   const router = useRouter();
 
-  // Mặc định ngày hiện tại
   const todayRaw = new Date();
   const todayStr = todayRaw.toISOString().split('T')[0]; // YYYY-MM-DD
 
@@ -45,44 +44,30 @@ export default function AddMedicalScreen() {
 
   const API_URL = `https://petcare-api-tuyet.onrender.com/api/pets/${petId}/medical`;
 
-  // 👇 HÀM THÔNG MINH: CHUYỂN MỌI ĐỊNH DẠNG VỀ YYYY-MM-DD
+  // Hàm chuẩn hóa ngày tháng (Chấp nhận cả / và -)
   const parseDateInput = (inputDate: string) => {
       if (!inputDate) return null;
-
-      // 1. Thay tất cả dấu / hoặc . thành dấu -
       let normalized = inputDate.replace(/[\/\.]/g, '-');
-      
-      // 2. Tách chuỗi
       const parts = normalized.split('-');
 
-      // Trường hợp 1: Nhập đúng chuẩn YYYY-MM-DD (2026-05-02)
-      if (parts[0].length === 4 && parts.length === 3) return normalized;
-
-      // Trường hợp 2: Nhập kiểu Việt Nam D-M-YYYY hoặc DD-MM-YYYY (2-5-2026)
-      if (parts.length === 3 && parts[2].length === 4) {
-          const day = parts[0].padStart(2, '0');   // Thêm số 0 nếu thiếu (2 -> 02)
-          const month = parts[1].padStart(2, '0'); // (5 -> 05)
+      if (parts[0].length === 4 && parts.length === 3) return normalized; // YYYY-MM-DD
+      if (parts.length === 3 && parts[2].length === 4) { // DD-MM-YYYY
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
           const year = parts[2];
           return `${year}-${month}-${day}`;
       }
-
-      return null; // Không hiểu định dạng
+      return null;
   };
 
-  // Chọn ngày từ Lịch (Ngày khám)
   const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
-    if (selectedDate) {
-      setDate(selectedDate.toISOString().split('T')[0]);
-    }
+    if (selectedDate) setDate(selectedDate.toISOString().split('T')[0]);
   };
 
-  // Chọn ngày từ Lịch (Tái khám)
   const onNextDateChange = (event: any, selectedDate?: Date) => {
     setShowNextDatePicker(false);
-    if (selectedDate) {
-      setNextDate(selectedDate.toISOString().split('T')[0]);
-    }
+    if (selectedDate) setNextDate(selectedDate.toISOString().split('T')[0]);
   };
 
   const pickImage = async () => {
@@ -93,7 +78,7 @@ export default function AddMedicalScreen() {
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // Logic đặt lịch (Dùng số giây để tránh lỗi Android)
+  // 👇 HÀM ĐẶT LỊCH (Đã sửa nội dung thông báo)
   const scheduleNextAppointment = async (validNextDateString: string) => {
     const parts = validNextDateString.split('-');
     const year = parseInt(parts[0]);
@@ -121,7 +106,8 @@ export default function AddMedicalScreen() {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "🔔 NHẮC LỊCH TÁI KHÁM",
-        body: `Hôm nay đến hẹn TÁI KHÁM cho bé (Vấn đề: ${title}). Bố/Mẹ nhớ đưa bé đi nhé!`,
+        // 👇 Ghi rõ ngày tháng vào nội dung để bạn không nhầm
+        body: `Ngày ${day}/${month + 1}) là lịch TÁI KHÁM cho bé (Vấn đề: ${title}). Bố/Mẹ nhớ đưa bé đi nhé!`,
         sound: true,
       },
       trigger: {
@@ -132,7 +118,7 @@ export default function AddMedicalScreen() {
     });
     
     const daysLeft = Math.ceil(diffInSeconds / (3600 * 24));
-    Alert.alert("Đã đặt lịch! 🔔", `App sẽ nhắc bạn sau khoảng ${daysLeft} ngày nữa (vào sáng ngày ${day}/${month + 1}/${year}).`);
+    Alert.alert("Đã đặt lịch! 🔔", `App sẽ nhắc bạn vào 8h sáng ngày ${day}/${month + 1}/${year} (${daysLeft} ngày nữa).`);
   };
 
   const handleAddRecord = async () => {
@@ -141,18 +127,15 @@ export default function AddMedicalScreen() {
       return;
     }
 
-    // 👇 BƯỚC QUAN TRỌNG: CHUẨN HÓA NGÀY TRƯỚC KHI GỬI
     const finalDate = parseDateInput(date);
     const finalNextDate = parseDateInput(nextDate);
 
     if (!finalDate) {
-        Alert.alert("Lỗi ngày khám", "Ngày khám không hợp lệ. Vui lòng nhập kiểu ngày-tháng-năm (VD: 02-05-2026)");
+        Alert.alert("Lỗi ngày khám", "Ngày khám không hợp lệ (VD: 02-05-2026)");
         return;
     }
-    
-    // Nếu có nhập ngày tái khám nhưng sai định dạng
     if (nextDate && !finalNextDate) {
-        Alert.alert("Lỗi ngày tái khám", "Ngày tái khám không hợp lệ. Vui lòng nhập kiểu ngày-tháng-năm (VD: 10-05-2026)");
+        Alert.alert("Lỗi ngày tái khám", "Ngày tái khám không hợp lệ (VD: 10-05-2026)");
         return;
     }
 
@@ -161,12 +144,13 @@ export default function AddMedicalScreen() {
       const token = await AsyncStorage.getItem('token');
       const formData = new FormData();
       
-      formData.append('date', finalDate); // Gửi ngày chuẩn YYYY-MM-DD
+      formData.append('date', finalDate);
       formData.append('title', title);
       formData.append('description', description);
       formData.append('doctor', doctor);
       formData.append('type', 'medical');
 
+      // 👇 Gửi ngày tái khám lên Server
       if (finalNextDate) {
           formData.append('next_appointment', finalNextDate);
       }
@@ -240,12 +224,7 @@ export default function AddMedicalScreen() {
             <View style={{flex: 1, marginRight: 10}}>
                 <Text style={styles.label}>Ngày khám</Text>
                 <View style={styles.dateInputContainer}>
-                    <TextInput 
-                        style={styles.dateInputText} 
-                        value={date} 
-                        onChangeText={setDate} 
-                        placeholder="DD-MM-YYYY" 
-                    />
+                    <TextInput style={styles.dateInputText} value={date} onChangeText={setDate} placeholder="DD-MM-YYYY" />
                     <TouchableOpacity onPress={() => setShowDatePicker(true)}>
                         <Ionicons name="calendar-outline" size={24} color="#FF6B81" />
                     </TouchableOpacity>
@@ -259,12 +238,7 @@ export default function AddMedicalScreen() {
             <View style={{flex: 1}}>
                 <Text style={[styles.label, {color: '#FF6B81'}]}>Ngày tái khám (?)</Text>
                 <View style={[styles.dateInputContainer, {borderColor: '#FF6B81'}]}>
-                    <TextInput 
-                        style={styles.dateInputText} 
-                        value={nextDate} 
-                        onChangeText={setNextDate} 
-                        placeholder="DD-MM-YYYY" 
-                    />
+                    <TextInput style={styles.dateInputText} value={nextDate} onChangeText={setNextDate} placeholder="DD-MM-YYYY" />
                     <TouchableOpacity onPress={() => setShowNextDatePicker(true)}>
                         <Ionicons name="alarm-outline" size={24} color="#FF6B81" />
                     </TouchableOpacity>
@@ -302,24 +276,21 @@ export default function AddMedicalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FECFEF' },
-  headerBackground: { height: 150, width: '100%', position: 'absolute', top: 0 },
-  header: { marginTop: 50, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' },
+  headerBackground: { height: 120, width: '100%', position: 'absolute', top: 0 },
+  header: { marginTop: 40, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' },
   backBtn: { backgroundColor: '#fff', padding: 10, borderRadius: 15, marginRight: 15, elevation: 5 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
   formContainer: { flex: 1, backgroundColor: '#fff', marginTop: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, elevation: 10 },
   instruction: { textAlign: 'center', color: '#888', marginBottom: 20, fontStyle: 'italic' },
   imagePicker: { height: 150, width: '100%', backgroundColor: '#FFF0F3', borderRadius: 15, borderStyle: 'dashed', borderWidth: 2, borderColor: '#FF9A9E', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   previewImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   placeholder: { alignItems: 'center' },
   label: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 5, marginTop: 10 },
-  input: { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 12, padding: 12, fontSize: 16, color: '#333' },
-  
-  // Style riêng cho ô nhập ngày (Kết hợp input + icon)
-  dateInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
-  dateInputText: { flex: 1, fontSize: 16, color: '#333', paddingVertical: 4 },
-
+  input: { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 10, padding: 10 },
+  dateInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEE', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  dateInputText: { flex: 1, paddingVertical: 5, color: '#333' },
   textArea: { height: 100 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
-  submitBtn: { padding: 18, borderRadius: 15, alignItems: 'center', shadowColor: '#FF6B81', shadowOpacity: 0.3, elevation: 5 },
+  submitBtn: { padding: 15, borderRadius: 15, alignItems: 'center', shadowColor: '#FF6B81', shadowOpacity: 0.3, elevation: 5 },
   submitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });

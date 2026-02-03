@@ -21,7 +21,7 @@ import * as Animatable from 'react-native-animatable';
 
 export default function EditPetScreen() {
   const { id } = useLocalSearchParams(); // Lấy ID từ trang chi tiết
-  const router = useRouter();
+  const router = useRouter(); 
 
   const [name, setName] = useState('');
   const [species, setSpecies] = useState('');
@@ -109,7 +109,9 @@ export default function EditPetScreen() {
       });
 
       Alert.alert('Thành công! ✨', 'Thông tin bé đã được cập nhật.');
-      router.replace('/home' as any); // Quay về Home để refresh dữ liệu
+      
+      // 👇 ĐÃ SỬA: Dùng router.back() để quay lại trang chi tiết thay vì đi link lung tung
+      router.back(); 
 
     } catch (error) {
       console.log('Update lỗi:', error);
