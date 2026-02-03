@@ -1,49 +1,24 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const petSchema = new mongoose.Schema({
-    owner: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    name: { type: String, required: true },
-    species: { type: String, required: true },
-    breed: { type: String },
-    gender: { type: String, enum: ['male', 'female'], default: 'male' },
-    weight: { type: Number, default: 0 },
-    birthday: { type: Date },
-    img_url: { type: String }, 
-    note: { type: String },
+  name: { type: String, required: true },
+  pet_type_id: { type: mongoose.Schema.Types.ObjectId, ref: 'PetType', required: true },
+  breed_id: { type: mongoose.Schema.Types.ObjectId, ref: 'PetBreed', required: true },
+  owner_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'unknown'],
+    default: 'unknown'
+  },
+  birth_date: Date,
+  color: String,
+  weight: Number,
+  avatar_url: String,
+  health_status: String,
+  notes: String,
+  created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+}, {
+  timestamps: true
+});
 
-    // 👇 THÊM MỚI: Mảng chứa bộ sưu tập ảnh (Growth Timeline)
-    gallery: [
-        {
-            img_url: { type: String, required: true },
-            date: { type: Date, default: Date.now },
-            caption: { type: String } // Ví dụ: "Lần đầu đi tắm", "Sinh nhật 1 tuổi"
-        }
-    ],
-
-    contact_info: { type: String, default: "Xin hãy gọi cho chủ nhân của tôi!" },
-    
-    // 👇 ĐÃ SỬA LẠI TÊN BIẾN THÀNH 'medical_records' (cho khớp với Route)
-    medical_records: [
-        {
-            date: { type: String }, // Đổi sang String để dễ lưu dạng YYYY-MM-DD từ App gửi lên
-            type: { type: String, default: 'medical' }, // Bỏ Enum cứng nhắc để tránh lỗi, mặc định là medical
-            title: { type: String, required: true },
-            description: { type: String },
-            doctor: { type: String },
-            
-            // 👇 Chỗ để lưu link ảnh X-quang/Đơn thuốc. 
-            // ⚠️ QUAN TRỌNG: Nhớ có dấu phẩy ở cuối dòng này nhé
-            img_url: { type: String }, 
-
-            // 👇 Dòng bạn mới thêm để lưu ngày tái khám
-            next_appointment: { type: String } 
-        }
-    ]
-
-}, { timestamps: true });
-
-module.exports = mongoose.model('Pet', petSchema);
+export default mongoose.model('Pet', petSchema);

@@ -1,93 +1,17 @@
-const express = require('express');
-const router = express.Router();
+import Router from 'express';
+import { createPet, getPets, getPetById, updatePet, deletePet } from '../controllers/pet.controller.js';
+import { protectedRoute } from '../middlewares/auth.middleware.js';
+const router = Router();
 
-// 👇 Import "Bảo vệ" (Auth)
-const authMiddleware = require('../middlewares/auth.middleware');
-const petController = require('../controllers/pet.controller');
+// Create a new pet
+router.post('/create-pet', protectedRoute, createPet);
+// Get all pets
+router.get('/get-all-pets', protectedRoute, getPets);
+// Get a pet by ID
+router.get('/get-pet/:id', protectedRoute, getPetById);
+// Update a pet by ID
+router.put('/update-pet/:id', protectedRoute, updatePet);
+// Delete a pet by ID
+router.delete('/delete-pet/:id', protectedRoute, deletePet);
 
-// 👇 Import "Vận chuyển" (Upload)
-const uploadCloud = require('../middlewares/uploader'); 
-
-// 👇 Import Model Pet
-const Pet = require('../models/Pet.model'); 
-
-// --- CÁC ROUTE CƠ BẢN ---
-router.post('/', authMiddleware, petController.createPet); 
-router.get('/', authMiddleware, petController.getPets);    
-router.get('/:id', authMiddleware, petController.getPet);
-router.delete('/:id', authMiddleware, petController.deletePet); 
-
-// 👇 ĐÃ SỬA: Thêm uploadCloud.single('image') vào đây để nhận ảnh khi chỉnh sửa
-router.put('/:id', authMiddleware, uploadCloud.single('image'), petController.updatePet); 
-
-// --- ROUTE THÊM HỒ SƠ Y TẾ (CÓ ẢNH) ---
-router.post('/:id/medical', authMiddleware, uploadCloud.single('image'), async (req, res) => {
-  try {
-    // 👇 ĐÃ SỬA: Thêm 'next_appointment' vào danh sách nhận dữ liệu
-    const { date, title, description, doctor, type, next_appointment } = req.body;
-    
-    // Lấy link ảnh nếu có
-    const img_url = req.file ? req.file.path : '';
-
-    const newRecord = {
-      date,
-      title: title || 'Khám bệnh',
-      description,
-      doctor,
-      type: type || 'medical',
-      img_url,
-      
-      // 👇 ĐÃ SỬA: Lưu ngày tái khám vào Database
-      next_appointment: next_appointment || null 
-    };
-
-    const pet = await Pet.findByIdAndUpdate(
-      req.params.id,
-      { $push: { medical_records: newRecord } },
-      { new: true }
-    );
-
-    if (!pet) return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng' });
-
-    res.json({ success: true, data: pet });
-
-  } catch (error) {
-    console.error("Lỗi thêm medical:", error);
-    res.status(500).json({ success: false, message: 'Lỗi server' });
-  }
-});
-
-// --- 👇 ROUTE MỚI: THÊM ẢNH VÀO BỘ SƯU TẬP (GALLERY) ---
-router.post('/:id/gallery', authMiddleware, uploadCloud.single('image'), async (req, res) => {
-  try {
-      if (!req.file) return res.status(400).json({ success: false, message: 'Chưa chọn ảnh' });
-
-      const newImage = {
-          img_url: req.file.path,
-          
-          // 👇 SỬA DÒNG NÀY: Nhận ngày từ App gửi lên
-          date: req.body.date || new Date(), 
-          
-          caption: req.body.caption || ''
-      };
-
-      const pet = await Pet.findByIdAndUpdate(
-          req.params.id,
-          { $push: { gallery: newImage } }, 
-          { new: true }
-      );
-
-      res.json({ success: true, data: pet });
-  } catch (error) {
-      console.error("Gallery upload error:", error);
-      res.status(500).json({ success: false, message: 'Lỗi server' });
-  }
-});
-
-// API Sửa bệnh án (Có upload ảnh nếu cần)
-router.put('/:petId/medical/:recordId', authMiddleware, uploadCloud.single('image'), petController.updateMedicalRecord);
-
-// API Xóa bệnh án
-router.delete('/:petId/medical/:recordId', authMiddleware, petController.deleteMedicalRecord);
-
-module.exports = router;
+export default router;

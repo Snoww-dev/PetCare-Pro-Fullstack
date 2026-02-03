@@ -1,11 +1,12 @@
-const express = require('express');
-const router = express.Router();
-const authController = require('../controllers/auth.controller');
+import { Router } from "express";
+import { changePassword, login, logout, refreshToken } from "../controllers/auth.controller.js";
+import { protectedRoute } from "../middlewares/auth.middleware.js";
 
-// Định nghĩa đường dẫn: POST /api/auth/register
-router.post('/register', authController.register);
+const router = Router();
 
-// <--- THÊM DÒNG NÀY
-router.post('/login', authController.login);
+router.post("/login", login);
+router.post("/logout", logout);
+router.post('/refresh', refreshToken);
+router.post('/change-password', protectedRoute, changePassword);
 
-module.exports = router;
+export default router;

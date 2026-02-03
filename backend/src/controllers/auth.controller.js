@@ -1,75 +1,107 @@
-const User = require('../models/User.model');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken'); // <--- Cần cái này để tạo vé
+import User from '../models/user.model.js';
+import Session from '../models/session.model.js';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
-// 1. Đăng Ký (Code cũ, giữ nguyên)
-const register = async (req, res) => {
+const ACCESS_TOKEN_TTL = '15m'; // 15 minutes
+const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const SALT_ROUNDS = 10;
+
+export const login = async (req, res) => {
     try {
-        const { display_name, email, password, phone } = req.body;
-        const userExists = await User.findOne({ email });
-        
-        if (userExists) {
-            return res.status(400).json({ message: 'Email này đã được sử dụng!' });
+        const { username, password } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required.' });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newUser = await User.create({
-            display_name, email, password: hashedPassword, phone
-        });
-
-        res.status(201).json({
-            success: true,
-            message: 'Đăng ký thành công!',
-            data: { id: newUser._id, email: newUser.email, display_name: newUser.display_name }
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Lỗi server: ' + error.message });
-    }
-};
-
-// 2. Đăng Nhập (MỚI THÊM)
-const login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        // a. Tìm xem email có tồn tại không
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ username });
         if (!user) {
-            return res.status(400).json({ message: 'Email hoặc mật khẩu không đúng!' });
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        // b. So sánh mật khẩu (Mật khẩu nhập vào vs Mật khẩu đã mã hóa trong DB)
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Email hoặc mật khẩu không đúng!' });
+        const passwordCorrect = await bcrypt.compare(password, user.password_hash);
+        if (!passwordCorrect) {
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        // c. Tạo vé vào cổng (Token) - Vé này có hạn 1 ngày
-        // Lưu ý: Cần tạo 1 mã bí mật trong file .env, tạm thời mình dùng cứng là 'tuyetsecret'
-        const token = jwt.sign(
-            { userId: user._id }, // ⚠️ PHẢI LÀ userId (không được viết là id hay sub)
-                process.env.JWT_SECRET || 'secret123',
-                { expiresIn: '7d' }
-        );
-
-        res.json({
-            success: true,
-            message: 'Đăng nhập thành công!',
-            token: token, // <--- Trả về cái vé này
-            user: {
-                id: user._id,
-                display_name: user.display_name,
-                email: user.email,
-                role: user.role
-            }
+        const accessToken = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+        const refresshToken = crypto.randomBytes(64).toString('hex'); // Example refresh token generation
+        await Session.create({
+            userId: user._id,
+            refreshToken: refresshToken,
+            expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL)
         });
-
+        res.cookie('refreshToken', refresshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            maxAge: REFRESH_TOKEN_TTL
+        });
+        res.status(200).json({ message: `Sign-in successful. Hello ${user.full_name}`, accessToken });
     } catch (error) {
-        res.status(500).json({ message: 'Lỗi server: ' + error.message });
+        console.log(error);
+        res.status(500).json({ message: 'Internal server error.' });
     }
-};
+}
 
-// Xuất cả 2 hàm ra
-module.exports = { register, login };
+export const logout = async (req, res) => {
+    try {
+        const token = req.cookies?.refreshToken;
+        if (token) {
+            await Session.deleteOne({ refreshToken: token });
+            res.clearCookie('refreshToken')
+        }
+        return res.sendStatus(204);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export const refreshToken = async (req, res) => {
+    try {
+        const token = req.cookies?.refreshToken;
+        if (!token) {
+            return res.status(401).json({ message: 'Refresh token missing.' });
+        }
+        const session = await Session.findOne({ refreshToken: token });
+        if (!session) {
+            return res.status(401).json({ message: 'Invalid or expired refresh token.' });
+        }
+        if (session.expiresAt < new Date()) {
+            return res.status(403).json({ message: 'Refresh token expired.' });
+        }
+        const accessToken = jwt.sign({ userId: session.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+        return res.status(200).json({ accessToken });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export const changePassword = async (req, res) => {
+    try {
+        const { oldPassword, newPassword, confirmPassword } = req.body;
+        if (!oldPassword || !newPassword || !confirmPassword) {
+            return res.status(400).json({ message: 'Old password, new password, and confirm password are required.' });
+        }
+        if (newPassword.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
+        }
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ message: 'New password and confirm password do not match.' });
+        }
+        const user = await User.findById(req.user._id).select('+password_hash');
+        const passwordCorrect = await bcrypt.compare(oldPassword, user.password_hash);
+        if (!passwordCorrect) {
+            return res.status(400).json({ message: 'Old password is incorrect.' });
+        }
+        const hashedNewPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+        await User.findByIdAndUpdate(user._id, { password_hash: hashedNewPassword });
+        res.status(200).json({ message: 'Password changed successfully.' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+}

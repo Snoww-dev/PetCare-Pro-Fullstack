@@ -1,24 +1,26 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
+import User from '../models/user.model.js';
 
-const authMiddleware = (req, res, next) => {
+export const protectedRoute = (req, res, next) => {
     try {
-        // 1. Lấy token từ header gửi lên
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
         if (!token) {
-            return res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập!' });
+            return res.status(401).json({ message: 'Access token is missing.' });
         }
-
-        // 2. Giải mã token xem có đúng chìa khóa không
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
-        
-        // 3. Lưu ID người dùng vào biến req để các hàm sau dùng
-        req.userId = decoded.userId;
-        
-        next(); // Cho phép đi tiếp
+        jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, async (err, decoded) => {
+            if (err) {
+                return res.status(403).json({ message: 'Invalid or expired access token.' });
+            }
+            const user = await User.findById(decoded.userId).select('-password_hash');
+            if (!user) {
+                return res.status(404).json({ message: 'User not found.' });
+            }
+            req.user = user;
+            next();
+        });
     } catch (error) {
-        res.status(401).json({ success: false, message: 'Token không hợp lệ!' });
+        console.log(error);
+        res.status(500).json({ message: 'Internal server error.' });
     }
-};
-
-module.exports = authMiddleware;
+}
