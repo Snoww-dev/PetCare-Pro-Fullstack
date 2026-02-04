@@ -3,15 +3,15 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./src/config/database');
 
-// 👇 1. Import Model Pet (Đưa lên đầu và sửa đường dẫn vào thư mục src)
-// Lưu ý: Kiểm tra file model của bạn tên là 'Pet.js' hay 'pet.model.js' để sửa cho khớp nhé.
-// Ở đây mình giả định là 'pet.model' theo chuẩn chung.
+// 1. Import Model Pet
 const Pet = require('./src/models/Pet.model.js'); 
 
 // --- CÁC ROUTE (ĐƯỜNG DẪN) ---
 const authRoutes = require('./src/routes/auth.route');
 const petRoutes = require('./src/routes/pet.route');
 const uploadRoutes = require('./src/routes/upload.route'); 
+// 👇 ĐÃ SỬA: Import User Route (Thêm src/ vào đường dẫn và đưa lên đây)
+const userRoutes = require('./src/routes/user.route');
 
 // 2. Khởi tạo ứng dụng Express
 const app = express();
@@ -27,8 +27,10 @@ app.use(cors());
 app.use('/api/auth', authRoutes);       
 app.use('/api/pets', petRoutes);        
 app.use('/api/upload', uploadRoutes);   
+// 👇 ĐÃ SỬA: Kích hoạt Route User tại đây
+app.use('/api/users', userRoutes);
 
-// 👇 === 5. ROUTE TÌM TRẺ LẠC (Đặt ở đây, TRƯỚC app.listen) ===
+// 👇 === 5. ROUTE TÌM TRẺ LẠC ===
 // Route công khai: Hiển thị thông tin Pet dưới dạng trang Web HTML
 app.get('/find/:id', async (req, res) => {
   try {
@@ -75,7 +77,7 @@ app.get('/find/:id', async (req, res) => {
     res.send(htmlContent);
 
   } catch (error) {
-    console.error(error); // In lỗi ra terminal để dễ sửa
+    console.error(error); 
     res.status(500).send('Lỗi Server: ' + error.message);
   }
 });
@@ -90,6 +92,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server đang chạy tại cổng ${PORT}`);
 });
-
-// Thông tin user
-app.use('/api/users', require('./routes/user.route'));
