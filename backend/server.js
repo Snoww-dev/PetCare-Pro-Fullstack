@@ -90,3 +90,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server đang chạy tại cổng ${PORT}`);
 });
+
+// Thông tin user
+app.use('/api/users', require('./routes/user.route'));

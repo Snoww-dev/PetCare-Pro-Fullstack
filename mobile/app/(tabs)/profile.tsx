@@ -1,25 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, Image, Switch } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useEffect, useState, useCallback } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, Image } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const [userInfo, setUserInfo] = useState({ name: 'Người dùng', email: 'loading...' });
   
-  // Lấy thông tin người dùng (Giả lập từ token hoặc gọi API user/me nếu bạn đã viết)
-  useEffect(() => {
-    getUserInfo();
-  }, []);
+  // Dùng useFocusEffect để mỗi khi quay lại trang này thì load lại tên mới (nếu có sửa)
+  useFocusEffect(
+    useCallback(() => {
+        getUserInfo();
+    }, [])
+  );
 
   const getUserInfo = async () => {
-    // Tạm thời mình lấy tên mặc định, sau này bạn có thể gọi API user details
     const email = await AsyncStorage.getItem('userEmail') || 'user@example.com'; 
-    // Nếu lúc login bạn có lưu tên thì lấy ra, không thì để mặc định
-    setUserInfo({ name: 'Sen Chăm Chỉ', email: email });
+    // Lấy tên từ bộ nhớ máy (được lưu bên trang EditProfile)
+    const name = await AsyncStorage.getItem('userName') || 'Sen Chăm Chỉ';
+    setUserInfo({ name: name, email: email });
   };
 
   const handleLogout = async () => {
@@ -29,11 +30,10 @@ export default function ProfileScreen() {
         text: 'Đồng ý', 
         style: 'destructive',
         onPress: async () => {
-            // 1. Xóa token
             await AsyncStorage.removeItem('token');
             await AsyncStorage.removeItem('userEmail');
+            await AsyncStorage.removeItem('userName');
             
-            // 2. Đá về trang Login (replace để không back lại được)
             router.replace('/(auth)/login' as any);
         } 
       }
@@ -63,7 +63,8 @@ export default function ProfileScreen() {
       {/* Menu Options */}
       <View style={styles.menuContainer}>
         
-        <TouchableOpacity style={styles.menuItem}>
+        {/* 👇 ĐÃ SỬA: Thêm onPress chuyển sang trang Edit Profile */}
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/edit-profile' as any)}>
             <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
                 <Ionicons name="person" size={20} color="#2196F3" />
             </View>
@@ -71,7 +72,8 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        {/* 👇 ĐÃ SỬA: Thêm onPress chuyển sang trang Settings */}
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings' as any)}>
             <View style={[styles.iconBox, { backgroundColor: '#E8F5E9' }]}>
                 <Ionicons name="settings" size={20} color="#4CAF50" />
             </View>
@@ -79,7 +81,8 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        {/* 👇 ĐÃ SỬA: Thêm onPress chuyển sang trang Help */}
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help' as any)}>
             <View style={[styles.iconBox, { backgroundColor: '#FFF3E0' }]}>
                 <Ionicons name="help-circle" size={20} color="#FF9800" />
             </View>
