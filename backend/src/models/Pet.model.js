@@ -10,7 +10,7 @@ const petSchema = new mongoose.Schema({
     species: { type: String, required: true },
     breed: { type: String },
     gender: { type: String, enum: ['male', 'female'], default: 'male' },
-    weight: { type: Number, default: 0 },
+    weight: { type: Number, default: 0 }, // Cân nặng hiện tại
     birthday: { type: Date },
     img_url: { type: String }, 
     note: { type: String },
@@ -46,7 +46,7 @@ const petSchema = new mongoose.Schema({
         }
     ],
 
-    // 👇 MỚI: Kế hoạch ăn uống (Diet Plans)
+    // Kế hoạch ăn uống (Diet Plans)
     diet_plans: [
         {
             time: { type: String, required: true }, // VD: "07:00"
@@ -54,6 +54,15 @@ const petSchema = new mongoose.Schema({
             food: { type: String }, // VD: "Hạt Royal Canin"
             amount: { type: String }, // VD: "50g"
             note: { type: String }
+        }
+    ],
+
+    // 👇 MỚI THÊM: Lịch sử cân nặng (Weight History)
+    weight_history: [
+        {
+            weight: { type: Number, required: true },
+            date: { type: Date, default: Date.now },
+            note: { type: String } // Sự kiện: Ốm, thay đổi thức ăn...
         }
     ]
 

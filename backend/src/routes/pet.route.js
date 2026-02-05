@@ -124,4 +124,7 @@ router.delete('/:petId/gallery/:itemId', authMiddleware, async (req, res) => {
 router.post('/:id/diet', authMiddleware, petController.addDietPlan);
 router.delete('/:petId/diet/:dietId', authMiddleware, petController.deleteDietPlan);
 
+router.post('/:id/weight', authMiddleware, petController.addWeightRecord);
+router.delete('/:petId/weight/:recordId', authMiddleware, petController.deleteWeightRecord);
+
 module.exports = router;

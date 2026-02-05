@@ -44,7 +44,6 @@ export default function PetDetailScreen() {
   const [editImageUri, setEditImageUri] = useState<string | null>(null);
 
   // --- STATE GALLERY & MODAL ---
-  // 👇 ĐÃ SỬA: Đổi tên cho đồng bộ
   const [addModalVisible, setAddModalVisible] = useState(false); 
   const [selectedImageUri, setSelectedImageUri] = useState('');
   const [caption, setCaption] = useState('');
@@ -94,6 +93,7 @@ export default function PetDetailScreen() {
     }
   };
 
+  // --- 1. LOGIC SỬA THÔNG TIN PET ---
   const handlePickEditImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.5, 
@@ -123,6 +123,7 @@ export default function PetDetailScreen() {
     } catch (error) { Alert.alert("Lỗi", "Không lưu được."); } finally { setSaving(false); }
   };
 
+  // --- 2. LOGIC THÊM ẢNH (ADD) ---
   const pickImageForGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.5, 
@@ -150,6 +151,7 @@ export default function PetDetailScreen() {
     } catch (error) { Alert.alert("Lỗi", "Upload thất bại."); } finally { setUploading(false); }
   };
 
+  // --- 3. LOGIC SỬA/XÓA ITEM GALLERY (EDIT ITEM) ---
   const openEditGalleryModal = (item: any) => {
       setCurrentGalleryItem(item);
       setEditGalleryCaption(item.caption || '');
@@ -304,19 +306,19 @@ export default function PetDetailScreen() {
                                 <Text style={styles.menuText}>QR Code</Text>
                             </TouchableOpacity>
                             
-                            <TouchableOpacity 
-                                style={styles.menuItem} 
-                                onPress={() => router.push({ pathname: '/diet-plan', params: { petId: pet._id } } as any)}
-                            >
-                                <View style={[styles.menuIcon, {backgroundColor:'#E8F5E9'}]}>
-                                    <Ionicons name="nutrition" size={18} color="#4CAF50"/>
-                                </View>
+                            <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/diet-plan', params: { petId: pet._id } } as any)}>
+                                <View style={[styles.menuIcon, {backgroundColor:'#E8F5E9'}]}><Ionicons name="nutrition" size={18} color="#4CAF50"/></View>
                                 <Text style={styles.menuText}>Ăn uống</Text>
                             </TouchableOpacity>
 
                             {/* 👇 Nút Cân nặng Mới */}
-                            <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert("Sắp ra mắt", "Tính năng theo dõi cân nặng sẽ sớm được cập nhật!")}>
-                                <View style={[styles.menuIcon, {backgroundColor:'#F3E5F5'}]}><Ionicons name="scale" size={18} color="#9C27B0"/></View>
+                            <TouchableOpacity 
+                                style={styles.menuItem} 
+                                onPress={() => router.push({ pathname: '/weight-chart', params: { petId: pet._id } } as any)}
+                            >
+                                <View style={[styles.menuIcon, {backgroundColor:'#F3E5F5'}]}>
+                                    <Ionicons name="scale" size={18} color="#9C27B0"/>
+                                </View>
                                 <Text style={styles.menuText}>Cân nặng</Text>
                             </TouchableOpacity>
 

@@ -245,3 +245,40 @@ exports.deleteDietPlan = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
+
+// 11. Thêm bản ghi cân nặng
+exports.addWeightRecord = async (req, res) => {
+    try {
+        const { weight, date, note } = req.body;
+        
+        // 1. Tìm và cập nhật mảng lịch sử
+        // 2. Cập nhật luôn field 'weight' hiện tại để hiển thị ở trang chủ
+        const pet = await Pet.findOneAndUpdate(
+            { _id: req.params.id, owner: req.userId },
+            { 
+                $push: { weight_history: { weight, date, note } },
+                $set: { weight: weight } 
+            },
+            { new: true }
+        );
+        res.json({ success: true, data: pet });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
+// 12. Xóa bản ghi cân nặng
+exports.deleteWeightRecord = async (req, res) => {
+    try {
+        const { petId, recordId } = req.params;
+        const pet = await Pet.findOneAndUpdate(
+            { _id: petId, owner: req.userId },
+            { $pull: { weight_history: { _id: recordId } } },
+            { new: true }
+        );
+        // (Nâng cao: Có thể logic để cập nhật lại weight = cái mới nhất còn lại, nhưng tạm thời bỏ qua cho đơn giản)
+        res.json({ success: true, data: pet });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
