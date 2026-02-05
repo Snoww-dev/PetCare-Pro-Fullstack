@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import * as ImagePicker from 'expo-image-picker'; // 👈 Thư viện chọn ảnh
-import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +17,11 @@ import {
 
 export default function AddPetScreen() {
   const router = useRouter();
+  
+  // 1. Nhận category từ trang Home
+  const params = useLocalSearchParams();
+  const category = params.category || 'owned'; // Mặc định là 'owned'
+
   const [loading, setLoading] = useState(false);
   
   // Form dữ liệu
@@ -26,15 +31,12 @@ export default function AddPetScreen() {
   const [weight, setWeight] = useState('');
   const [gender, setGender] = useState('male');
   
-  // Xử lý ảnh
-  const [imageUri, setImageUri] = useState<string | null>(null); // Link ảnh trên máy (để xem trước)
+  const [imageUri, setImageUri] = useState<string | null>(null);
 
-  // ⚠️ IP CỦA BẠN (Kiểm tra kỹ nhé)
+  // ⚠️ IP SERVER CỦA BẠN
   const API_URL = 'https://petcare-api-tuyet.onrender.com/api'; 
 
-  // 1. Hàm mở thư viện chọn ảnh
   const pickImage = async () => {
-    // Xin quyền truy cập thư viện
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Lỗi', 'Cần cấp quyền truy cập thư viện ảnh!');
@@ -42,44 +44,17 @@ export default function AddPetScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Chỉ lấy ảnh
-      allowsEditing: true, // Cho phép cắt ảnh
-      aspect: [1, 1], // Cắt hình vuông cho đẹp
-      quality: 0.5, // Giảm chất lượng chút cho nhẹ Server
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri); // Lưu link ảnh tạm để hiển thị
+      setImageUri(result.assets[0].uri);
     }
   };
 
-  // 2. Hàm upload ảnh lên Server
-  const uploadImageToServer = async () => {
-    if (!imageUri) return null; // Nếu không chọn ảnh thì thôi
-
-    const formData = new FormData();
-    // ⚠️ React Native quy định gửi file phải đúng format này
-    formData.append('image', {
-      uri: imageUri,
-      name: 'pet_photo.jpg',
-      type: 'image/jpeg',
-    } as any);
-
-    try {
-      const response = await axios.post(`${API_URL}/upload`, formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data' 
-        },
-      });
-      return response.data.imageUrl; // Trả về link ảnh online (Cloudinary)
-    } catch (error) {
-      console.log('Lỗi upload ảnh:', error);
-      Alert.alert('Lỗi', 'Không thể tải ảnh lên.');
-      return null;
-    }
-  };
-
-  // 3. Hàm Lưu tất cả (Lưu ảnh trước -> Lấy link -> Lưu thông tin Pet)
   const handleAddPet = async () => {
     if (!name || !species) {
       Alert.alert('Thiếu thông tin', 'Vui lòng nhập tên và loài!');
@@ -89,27 +64,35 @@ export default function AddPetScreen() {
     setLoading(true);
 
     try {
-      // BƯỚC 1: Upload ảnh trước (nếu có)
-      let finalImgUrl = '';
+      const token = await AsyncStorage.getItem('token');
+      const formData = new FormData();
+
+      // Thông tin cơ bản
+      formData.append('name', name);
+      formData.append('species', species);
+      formData.append('breed', breed);
+      formData.append('weight', weight);
+      formData.append('gender', gender);
+      
+      // 👇 Gửi category để Server biết loại pet
+      formData.append('category', category as string);
+
+      // Ảnh (Nếu có)
       if (imageUri) {
-        finalImgUrl = await uploadImageToServer();
-        if (!finalImgUrl) {
-            setLoading(false);
-            return; // Nếu lỗi upload thì dừng luôn
-        }
+          // @ts-ignore
+          formData.append('image', {
+              uri: imageUri,
+              type: 'image/jpeg',
+              name: 'pet-avatar.jpg',
+          });
       }
 
-      // BƯỚC 2: Gửi thông tin Pet kèm link ảnh vừa có
-      const token = await AsyncStorage.getItem('token');
-      await axios.post(`${API_URL}/pets`, {
-        name,
-        species,
-        breed,
-        weight: Number(weight),
-        gender,
-        img_url: finalImgUrl // 👈 Lưu link ảnh thật vào đây
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+      // Gọi API tạo Pet
+      await axios.post(`${API_URL}/pets`, formData, {
+        headers: { 
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}` 
+        }
       });
 
       setLoading(false);
@@ -125,9 +108,11 @@ export default function AddPetScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Thêm Thú Cưng Mới 🐾</Text>
+      <Text style={styles.title}>
+          {category === 'owned' ? 'Thêm Thú Cưng Mới 🐾' : 'Lưu Ảnh Thú Cưng Đã Gặp 📸'}
+      </Text>
 
-      {/* --- KHUNG CHỌN ẢNH --- */}
+      {/* KHUNG CHỌN ẢNH */}
       <View style={styles.imageContainer}>
         <TouchableOpacity onPress={pickImage}>
             {imageUri ? (
@@ -150,8 +135,12 @@ export default function AddPetScreen() {
       <Text style={styles.label}>Giống loài</Text>
       <TextInput style={styles.input} placeholder="VD: Poodle, Mèo Anh..." value={breed} onChangeText={setBreed} />
 
-      <Text style={styles.label}>Cân nặng (kg)</Text>
-      <TextInput style={styles.input} placeholder="VD: 5.5" keyboardType="numeric" value={weight} onChangeText={setWeight} />
+      {category === 'owned' && (
+          <>
+            <Text style={styles.label}>Cân nặng (kg)</Text>
+            <TextInput style={styles.input} placeholder="VD: 5.5" keyboardType="numeric" value={weight} onChangeText={setWeight} />
+          </>
+      )}
 
       <Text style={styles.label}>Giới tính</Text>
       <View style={{ flexDirection: 'row', marginBottom: 20 }}>
@@ -181,9 +170,8 @@ export default function AddPetScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, backgroundColor: '#ffffff', padding: 20, paddingTop: 50 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#FF8E9E', marginBottom: 20, textAlign: 'center' },
+  title: { fontSize: 22, fontWeight: 'bold', color: '#FF8E9E', marginBottom: 20, textAlign: 'center' },
   
-  // Style cho ảnh
   imageContainer: { alignItems: 'center', marginBottom: 20 },
   imagePreview: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#FF8E9E' },
   imagePlaceholder: { 
