@@ -65,7 +65,6 @@ export default function PetDetailScreen() {
 
   const API_URL = `https://petcare-api-tuyet.onrender.com/api/pets/${params.id}`;
 
-  // 👇 TỰ ĐỘNG CẬP NHẬT KHI QUAY LẠI TỪ TRANG CÂN NẶNG
   useFocusEffect(
     useCallback(() => {
       fetchPetDetail();
@@ -83,10 +82,7 @@ export default function PetDetailScreen() {
       
       setEditName(data.name);
       setEditBreed(data.breed || '');
-      
-      // 👇 Luôn lấy cân nặng mới nhất từ server
       setEditWeight(data.weight ? data.weight.toString() : '');
-      
       setEditNote(data.note || '');
       setEditCategory(data.category === 'owned'); 
 
@@ -111,7 +107,7 @@ export default function PetDetailScreen() {
         const formData = new FormData();
         formData.append('name', editName);
         formData.append('breed', editBreed);
-        formData.append('weight', editWeight);
+        // formData.append('weight', editWeight); 
         formData.append('note', editNote);
         formData.append('category', editCategory ? 'owned' : 'encountered');
         if (editImageUri) {
@@ -189,7 +185,6 @@ export default function PetDetailScreen() {
       ]);
   };
 
-  // --- XỬ LÝ HỒ SƠ Y TẾ ---
   const handleDeleteMedicalRecord = async (recordId: string) => {
     Alert.alert("Xác nhận xóa", "Xóa hồ sơ này khỏi lịch sử?", [
         { text: "Hủy", style: "cancel" },
@@ -209,6 +204,7 @@ export default function PetDetailScreen() {
   // --- RENDERERS ---
   const renderMedicalRecord = ({ item }: any) => (
     <View style={styles.recordItem}>
+        {/* Box hiển thị ngày tháng NGANG HÀNG */}
         <View style={styles.recordDateBox}>
             <Text style={styles.recordDateDay}>{new Date(item.date).getDate()}</Text>
             <Text style={styles.recordDateMonth}>/{new Date(item.date).getMonth() + 1}</Text>
@@ -222,6 +218,16 @@ export default function PetDetailScreen() {
             }}
         >
             <Text style={styles.recordTitle}>{item.title} {item.type === 'vaccine' ? '💉' : '💊'}</Text>
+            
+            <View style={{marginVertical: 4}}>
+                
+                {item.next_appointment ? (
+                    <Text style={{fontSize: 12, color: '#FF9800', fontWeight: 'bold', marginTop: 2}}>
+                        ⏰ Tái khám: {new Date(item.next_appointment).toLocaleDateString('vi-VN')}
+                    </Text>
+                ) : null}
+            </View>
+
             {item.description ? <Text style={styles.recordDesc} numberOfLines={1}>{item.description}</Text> : null}
         </TouchableOpacity>
 
@@ -277,11 +283,14 @@ export default function PetDetailScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
                 <Text style={styles.sectionHeader}>Thông tin cơ bản</Text>
                 <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholder="Tên bé" />
+                
                 <View style={{flexDirection:'row', gap:10}}>
                     <TextInput style={[styles.input, {flex:1}]} value={editBreed} onChangeText={setEditBreed} placeholder="Giống" />
-                    <View style={[styles.input, {flex:1, justifyContent:'center', backgroundColor:'#eee'}]}>
-                        <Text style={{color:'#999'}}>⚖️ {editWeight} kg</Text>
-                    </View>                </View>
+                    <View style={[styles.input, {flex:1, justifyContent:'center', backgroundColor:'#F0F0F0'}]}>
+                        <Text style={{color:'#888'}}>⚖️ {editWeight} kg</Text>
+                    </View>
+                </View>
+                
                 <TextInput style={[styles.input, {height:60}]} value={editNote} onChangeText={setEditNote} multiline placeholder="Ghi chú" />
                 <View style={styles.switchRow}>
                     <Text style={styles.switchText}>Đang nuôi</Text>
@@ -301,24 +310,19 @@ export default function PetDetailScreen() {
 
                 {pet.category === 'owned' ? (
                     <>
-                        {/* MENU NHANH - ĐÃ THÊM NÚT CÂN NẶNG */}
                         <View style={styles.menuRow}>
                             <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/qrcode', params: { id: pet._id, name: pet.name } } as any)}>
                                 <View style={[styles.menuIcon, {backgroundColor:'#E3F2FD'}]}><Ionicons name="qr-code" size={18} color="#2196F3"/></View>
                                 <Text style={styles.menuText}>QR Code</Text>
                             </TouchableOpacity>
-                            
                             <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/diet-plan', params: { petId: pet._id } } as any)}>
                                 <View style={[styles.menuIcon, {backgroundColor:'#E8F5E9'}]}><Ionicons name="nutrition" size={18} color="#4CAF50"/></View>
                                 <Text style={styles.menuText}>Ăn uống</Text>
                             </TouchableOpacity>
-
-                            {/* 👇 Nút Cân nặng Mới */}
                             <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/weight-chart', params: { petId: pet._id } } as any)}>
                                 <View style={[styles.menuIcon, {backgroundColor:'#F3E5F5'}]}><Ionicons name="scale" size={18} color="#9C27B0"/></View>
                                 <Text style={styles.menuText}>Cân nặng</Text>
                             </TouchableOpacity>
-
                             <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/add-medical', params: { petId: pet._id } } as any)}>
                                 <View style={[styles.menuIcon, {backgroundColor:'#FFF3E0'}]}><Ionicons name="medkit" size={18} color="#FF9800"/></View>
                                 <Text style={styles.menuText}>Sức khỏe</Text>
@@ -407,23 +411,28 @@ export default function PetDetailScreen() {
                         {selectedMedicalRecord.img_url ? (
                             <Image source={{ uri: selectedMedicalRecord.img_url }} style={{width:'100%', height: 200, borderRadius: 10, marginBottom: 15, resizeMode:'contain'}} />
                         ) : null}
+
                         <Text style={styles.detailTitle}>{selectedMedicalRecord.title}</Text>
+                        
                         <View style={styles.detailRow}>
                             <Ionicons name="calendar-outline" size={16} color="#FF6B81"/>
                             <Text style={styles.detailText}> Ngày khám: {new Date(selectedMedicalRecord.date).toLocaleDateString('vi-VN')}</Text>
                         </View>
+
                         {selectedMedicalRecord.doctor ? (
                             <View style={styles.detailRow}>
                                 <Ionicons name="person-outline" size={16} color="#FF6B81"/>
                                 <Text style={styles.detailText}> Bác sĩ: {selectedMedicalRecord.doctor}</Text>
                             </View>
                         ) : null}
+
                         {selectedMedicalRecord.next_appointment ? (
                             <View style={[styles.detailRow, {backgroundColor:'#FFF0F3', padding:8, borderRadius:5}]}>
                                 <Ionicons name="alarm-outline" size={16} color="#FF6B81"/>
                                 <Text style={[styles.detailText, {color:'#FF6B81', fontWeight:'bold'}]}> Tái khám: {new Date(selectedMedicalRecord.next_appointment).toLocaleDateString('vi-VN')}</Text>
                             </View>
                         ) : null}
+
                         <Text style={styles.detailLabel}>Nội dung / Chẩn đoán:</Text>
                         <Text style={styles.detailDesc}>{selectedMedicalRecord.description}</Text>
                     </ScrollView>
@@ -474,14 +483,36 @@ const styles = StyleSheet.create({
   galleryOverlay: { position: 'absolute', bottom: 0, width: '100%', padding: 6 },
   galleryDate: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
   galleryCaption: { color: '#eee', fontSize: 8, fontStyle: 'italic' },
+  
+  // 👇 STYLE MỚI CHO DATE BOX NGANG HÀNG
   recordItem: { flexDirection: 'row', marginBottom: 12, backgroundColor: '#fff', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#f0f0f0', shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 3, elevation: 1, alignItems: 'center' },
-  recordDateBox: { width: 40, alignItems: 'center', justifyContent: 'center', borderRightWidth: 1, borderRightColor: '#eee', marginRight: 10 },
-  recordDateDay: { fontSize: 16, fontWeight: 'bold', color: '#FF6B81' },
-  recordDateMonth: { fontSize: 10, color: '#999' },
+  
+  recordDateBox: { 
+      width: 60, // Tăng width để chứa ngang
+      flexDirection: 'row', // Xếp ngang
+      alignItems: 'baseline', // Căn chân chữ
+      justifyContent: 'center', 
+      borderRightWidth: 1, 
+      borderRightColor: '#eee', 
+      marginRight: 10,
+      paddingRight: 5 
+  },
+  recordDateDay: { 
+      fontSize: 18, 
+      fontWeight: 'bold', 
+      color: '#FF6B81' 
+  },
+  recordDateMonth: { 
+      fontSize: 14, 
+      color: '#999',
+      fontWeight: '600'
+  },
+  
   recordContent: { flex: 1 },
   recordTitle: { fontSize: 14, fontWeight: 'bold', color: '#333' },
   recordDesc: { fontSize: 12, color: '#666', marginTop: 2 },
   recordMoreBtn: { padding: 10 },
+  
   detailTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 15, textAlign: 'center' },
   detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   detailText: { fontSize: 14, color: '#555', marginLeft: 8 },
