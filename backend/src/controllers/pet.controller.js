@@ -87,37 +87,39 @@ exports.deletePet = async (req, res) => {
 
 // 4. CẬP NHẬT THÔNG TIN THÚ CƯNG
 exports.updatePet = async (req, res) => {
-  try {
-    const { name, species, breed, age, weight, gender, note, contact_info } = req.body;
-    
-    let updateData = {
-      name, species, breed, note, contact_info,
-      age: age ? Number(age) : undefined,
-      weight: weight ? Number(weight) : undefined,
-      gender
-    };
-
-    if (req.file) {
-      updateData.img_url = req.file.path;
+    try {
+      // 👇 Thêm 'category' vào đây để cho phép cập nhật trạng thái (Nuôi <-> Gặp)
+      const { name, species, breed, age, weight, gender, note, contact_info, category } = req.body;
+      
+      let updateData = {
+        name, species, breed, note, contact_info,
+        category, // 👈 Lưu category mới vào database
+        age: age ? Number(age) : undefined,
+        weight: weight ? Number(weight) : undefined,
+        gender
+      };
+  
+      if (req.file) {
+        updateData.img_url = req.file.path;
+      }
+  
+      const updatedPet = await Pet.findByIdAndUpdate(
+        req.params.id, 
+        updateData, 
+        { new: true } 
+      );
+  
+      if (!updatedPet) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng' });
+      }
+  
+      res.json({ success: true, data: updatedPet });
+  
+    } catch (error) {
+      console.error("Lỗi update pet:", error);
+      res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật' });
     }
-
-    const updatedPet = await Pet.findByIdAndUpdate(
-      req.params.id, 
-      updateData, 
-      { new: true } 
-    );
-
-    if (!updatedPet) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng' });
-    }
-
-    res.json({ success: true, data: updatedPet });
-
-  } catch (error) {
-    console.error("Lỗi update pet:", error);
-    res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật' });
-  }
-};
+  };
 
 // 5. Thêm hồ sơ sức khỏe (Dự phòng)
 exports.addMedicalRecord = async (req, res) => {
@@ -197,7 +199,7 @@ exports.deleteMedicalRecord = async (req, res) => {
         const pet = await Pet.findOneAndUpdate(
             { _id: petId, owner: req.userId },
             { $pull: { medical_records: { _id: recordId } } }, 
-            { new: true }
+            { new: true }   
         );
 
         if (!pet) return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng!' });
@@ -206,4 +208,4 @@ exports.deleteMedicalRecord = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: 'Lỗi xóa medical: ' + error.message });
     }
-};
+};  

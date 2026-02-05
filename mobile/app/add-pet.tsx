@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,10 +17,16 @@ import {
 
 export default function AddPetScreen() {
   const router = useRouter();
-  
-  // 1. Nhận category từ trang Home
   const params = useLocalSearchParams();
-  const category = params.category || 'owned'; // Mặc định là 'owned'
+
+  // STATE QUẢN LÝ LOẠI THÚ CƯNG
+  const [selectedCategory, setSelectedCategory] = useState<string>('owned');
+
+  useEffect(() => {
+    if (params.category) {
+        setSelectedCategory(params.category as string);
+    }
+  }, [params.category]);
 
   const [loading, setLoading] = useState(false);
   
@@ -31,9 +37,11 @@ export default function AddPetScreen() {
   const [weight, setWeight] = useState('');
   const [gender, setGender] = useState('male');
   
+  // 👇 THÊM STATE MÔ TẢ
+  const [note, setNote] = useState('');
+  
   const [imageUri, setImageUri] = useState<string | null>(null);
 
-  // ⚠️ IP SERVER CỦA BẠN
   const API_URL = 'https://petcare-api-tuyet.onrender.com/api'; 
 
   const pickImage = async () => {
@@ -47,7 +55,10 @@ export default function AddPetScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7,
+      
+      // 👇 Bỏ width để tránh lỗi TypeScript, giảm quality xuống 0.5 cho nhẹ
+      allowsMultipleSelection: false,
+      quality: 0.5, 
     });
 
     if (!result.canceled) {
@@ -56,9 +67,13 @@ export default function AddPetScreen() {
   };
 
   const handleAddPet = async () => {
-    if (!name || !species) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập tên và loài!');
+    if (!name) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập tên thú cưng!');
       return;
+    }
+    if (!species) {
+        Alert.alert('Thiếu thông tin', 'Vui lòng nhập loài (VD: Chó, Mèo...)');
+        return;
     }
 
     setLoading(true);
@@ -67,17 +82,27 @@ export default function AddPetScreen() {
       const token = await AsyncStorage.getItem('token');
       const formData = new FormData();
 
-      // Thông tin cơ bản
+      // Thông tin chung
       formData.append('name', name);
       formData.append('species', species);
-      formData.append('breed', breed);
-      formData.append('weight', weight);
-      formData.append('gender', gender);
+      formData.append('category', selectedCategory);
       
-      // 👇 Gửi category để Server biết loại pet
-      formData.append('category', category as string);
+      // 👇 Gửi thêm Mô tả (Note)
+      formData.append('note', note);
 
-      // Ảnh (Nếu có)
+      // Xử lý dữ liệu tùy theo loại
+      if (selectedCategory === 'owned') {
+          formData.append('breed', breed);
+          formData.append('weight', weight);
+          formData.append('gender', gender);
+      } else {
+          // Gửi giá trị mặc định cho "Đã gặp"
+          formData.append('breed', 'Không rõ');
+          formData.append('weight', '0'); 
+          formData.append('gender', 'male'); 
+      }
+
+      // Ảnh
       if (imageUri) {
           // @ts-ignore
           formData.append('image', {
@@ -87,7 +112,7 @@ export default function AddPetScreen() {
           });
       }
 
-      // Gọi API tạo Pet
+      // Gọi API
       await axios.post(`${API_URL}/pets`, formData, {
         headers: { 
             'Content-Type': 'multipart/form-data',
@@ -96,23 +121,38 @@ export default function AddPetScreen() {
       });
 
       setLoading(false);
-      Alert.alert('Thành công 🎉', 'Đã thêm thú cưng mới!');
+      Alert.alert('Thành công 🎉', 'Đã lưu thông tin thú cưng!');
       router.replace('/(tabs)');
 
     } catch (error) {
       setLoading(false);
       console.log("Lỗi thêm pet:", error);
-      Alert.alert('Lỗi', 'Có lỗi xảy ra khi lưu.');
+      Alert.alert('Lỗi', 'Có lỗi xảy ra. Server có thể đang khởi động, vui lòng thử lại!');
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>
-          {category === 'owned' ? 'Thêm Thú Cưng Mới 🐾' : 'Lưu Ảnh Thú Cưng Đã Gặp 📸'}
-      </Text>
+      <Text style={styles.headerTitle}>Thêm Hồ Sơ Mới 📝</Text>
 
-      {/* KHUNG CHỌN ẢNH */}
+      {/* THANH CHỌN LOẠI */}
+      <View style={styles.toggleContainer}>
+          <TouchableOpacity 
+            style={[styles.toggleBtn, selectedCategory === 'owned' && styles.toggleBtnActive]}
+            onPress={() => setSelectedCategory('owned')}
+          >
+             <Text style={[styles.toggleText, selectedCategory === 'owned' && styles.toggleTextActive]}>🏠 Đang nuôi</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.toggleBtn, selectedCategory === 'encountered' && styles.toggleBtnActive]}
+            onPress={() => setSelectedCategory('encountered')}
+          >
+             <Text style={[styles.toggleText, selectedCategory === 'encountered' && styles.toggleTextActive]}>📸 Đã gặp</Text>
+          </TouchableOpacity>
+      </View>
+
+      {/* CHỌN ẢNH */}
       <View style={styles.imageContainer}>
         <TouchableOpacity onPress={pickImage}>
             {imageUri ? (
@@ -120,45 +160,65 @@ export default function AddPetScreen() {
             ) : (
                 <View style={styles.imagePlaceholder}>
                     <Text style={{fontSize: 40}}>📸</Text>
-                    <Text style={{color: '#999', marginTop: 5}}>Chọn ảnh đại diện</Text>
+                    <Text style={{color: '#999', marginTop: 5}}>Ảnh đại diện</Text>
                 </View>
             )}
         </TouchableOpacity>
       </View>
 
+      {/* INPUT DATA */}
       <Text style={styles.label}>Tên thú cưng (*)</Text>
       <TextInput style={styles.input} placeholder="VD: Miu, Lu..." value={name} onChangeText={setName} />
 
       <Text style={styles.label}>Loài (*)</Text>
       <TextInput style={styles.input} placeholder="VD: Chó, Mèo..." value={species} onChangeText={setSpecies} />
 
-      <Text style={styles.label}>Giống loài</Text>
-      <TextInput style={styles.input} placeholder="VD: Poodle, Mèo Anh..." value={breed} onChangeText={setBreed} />
+      {selectedCategory === 'owned' && (
+        <View style={styles.advancedSection}>
+            <Text style={styles.label}>Giống loài</Text>
+            <TextInput style={styles.input} placeholder="VD: Poodle, Mèo Anh..." value={breed} onChangeText={setBreed} />
 
-      {category === 'owned' && (
-          <>
             <Text style={styles.label}>Cân nặng (kg)</Text>
             <TextInput style={styles.input} placeholder="VD: 5.5" keyboardType="numeric" value={weight} onChangeText={setWeight} />
-          </>
+
+            <Text style={styles.label}>Giới tính</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+                <TouchableOpacity 
+                    style={[styles.genderBtn, gender === 'male' && styles.genderBtnActive]} 
+                    onPress={() => setGender('male')}>
+                    <Text style={[styles.genderText, gender === 'male' && {color: '#fff'}]}>♂️ Đực</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                    style={[styles.genderBtn, gender === 'female' && styles.genderBtnActive]} 
+                    onPress={() => setGender('female')}>
+                    <Text style={[styles.genderText, gender === 'female' && {color: '#fff'}]}>♀️ Cái</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
       )}
 
-      <Text style={styles.label}>Giới tính</Text>
-      <View style={{ flexDirection: 'row', marginBottom: 20 }}>
-        <TouchableOpacity 
-            style={[styles.genderBtn, gender === 'male' && styles.genderBtnActive]} 
-            onPress={() => setGender('male')}>
-            <Text style={[styles.genderText, gender === 'male' && {color: '#fff'}]}>♂️ Đực</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-            style={[styles.genderBtn, gender === 'female' && styles.genderBtnActive]} 
-            onPress={() => setGender('female')}>
-            <Text style={[styles.genderText, gender === 'female' && {color: '#fff'}]}>♀️ Cái</Text>
-        </TouchableOpacity>
-      </View>
+      {/* 👇 PHẦN MÔ TẢ (HIỆN CHO CẢ 2 LOẠI) */}
+      <Text style={styles.label}>Mô tả / Ghi chú thêm</Text>
+      <TextInput 
+        style={[styles.input, styles.textArea]} 
+        placeholder={selectedCategory === 'owned' ? "VD: Bé thích ăn cá, hay ngủ ngày..." : "VD: Gặp ở công viên, rất thân thiện..."}
+        value={note} 
+        onChangeText={setNote}
+        multiline={true}
+        numberOfLines={4}
+      />
 
+      {/* BUTTON SUBMIT */}
       <TouchableOpacity style={styles.submitButton} onPress={handleAddPet} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>LƯU HỒ SƠ ❤️</Text>}
+        {loading ? (
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <ActivityIndicator color="#fff" />
+                <Text style={[styles.submitText, {marginLeft: 10}]}>Đang tải lên...</Text>
+            </View>
+        ) : (
+            <Text style={styles.submitText}>LƯU LẠI ❤️</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -170,23 +230,27 @@ export default function AddPetScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, backgroundColor: '#ffffff', padding: 20, paddingTop: 50 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#FF8E9E', marginBottom: 20, textAlign: 'center' },
-  
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 20, textAlign: 'center' },
+  toggleContainer: { flexDirection: 'row', backgroundColor: '#F0F0F0', borderRadius: 15, padding: 5, marginBottom: 25 },
+  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 },
+  toggleBtnActive: { backgroundColor: '#fff', elevation: 2, shadowColor: '#000', shadowOpacity: 0.1 },
+  toggleText: { fontSize: 16, color: '#999', fontWeight: '600' },
+  toggleTextActive: { color: '#FF6B81', fontWeight: 'bold' },
   imageContainer: { alignItems: 'center', marginBottom: 20 },
   imagePreview: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#FF8E9E' },
-  imagePlaceholder: { 
-    width: 120, height: 120, borderRadius: 60, backgroundColor: '#FFF0F3', 
-    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FF8E9E', borderStyle: 'dashed'
-  },
-
-  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 5 },
-  input: { backgroundColor: '#FFF0F3', borderRadius: 10, padding: 12, marginBottom: 15 },
+  imagePlaceholder: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#FFF0F3', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FF8E9E', borderStyle: 'dashed' },
   
+  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 5, marginLeft: 5 },
+  input: { backgroundColor: '#FFF0F3', borderRadius: 10, padding: 12, marginBottom: 15, fontSize: 16 },
+  
+  // Style riêng cho ô mô tả
+  textArea: { height: 100, textAlignVertical: 'top' },
+
+  advancedSection: { marginTop: 5 },
   genderBtn: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#FF8E9E', alignItems: 'center', marginHorizontal: 5 },
   genderBtnActive: { backgroundColor: '#FF8E9E' },
   genderText: { fontWeight: 'bold', color: '#FF8E9E' },
-
-  submitButton: { backgroundColor: '#FF8E9E', padding: 15, borderRadius: 30, alignItems: 'center', marginTop: 10, marginBottom: 10 },
+  submitButton: { backgroundColor: '#FF8E9E', padding: 15, borderRadius: 30, alignItems: 'center', marginTop: 20, marginBottom: 10, elevation: 3 },
   submitText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   backButton: { alignItems: 'center', padding: 10 }
 });
