@@ -24,7 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function PetDetailScreen() {
   const router = useRouter();
@@ -34,23 +34,30 @@ export default function PetDetailScreen() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // --- STATE CHẾ ĐỘ SỬA (EDIT MODE) ---
+  // --- EDIT MODE ---
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editBreed, setEditBreed] = useState('');
   const [editWeight, setEditWeight] = useState('');
   const [editNote, setEditNote] = useState('');
-  const [editCategory, setEditCategory] = useState(false); // false: Đã gặp, true: Đang nuôi
+  const [editCategory, setEditCategory] = useState(false); 
   const [editImageUri, setEditImageUri] = useState<string | null>(null);
 
-  // --- STATE GALLERY & MODAL ---
-  const [modalVisible, setModalVisible] = useState(false);
+  // --- ADD GALLERY MODAL ---
+  const [addModalVisible, setAddModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState('');
   const [caption, setCaption] = useState('');
   const [galleryDate, setGalleryDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [viewModalVisible, setViewModalVisible] = useState(false);
-  const [viewImage, setViewImage] = useState<any>(null);
+  
+  // --- EDIT GALLERY ITEM MODAL (NEW FEATURE) ---
+  const [editGalleryVisible, setEditGalleryVisible] = useState(false);
+  const [currentGalleryItem, setCurrentGalleryItem] = useState<any>(null);
+  const [editGalleryCaption, setEditGalleryCaption] = useState('');
+  const [editGalleryDate, setEditGalleryDate] = useState(new Date());
+
+  // Date Pickers Control
+  const [showDatePicker, setShowDatePicker] = useState(false); // Cho Add
+  const [showEditGalleryDatePicker, setShowEditGalleryDatePicker] = useState(false); // Cho Edit
 
   const API_URL = `https://petcare-api-tuyet.onrender.com/api/pets/${params.id}`;
 
@@ -69,7 +76,6 @@ export default function PetDetailScreen() {
       const data = response.data.data;
       setPet(data);
       
-      // Nạp dữ liệu vào form sửa
       setEditName(data.name);
       setEditBreed(data.breed || '');
       setEditWeight(data.weight ? data.weight.toString() : '');
@@ -78,22 +84,17 @@ export default function PetDetailScreen() {
 
       setLoading(false);
     } catch (error) {
-      console.log("Lỗi lấy chi tiết:", error);
+      console.log("Lỗi:", error);
       setLoading(false);
     }
   };
 
-  // --- HÀM XỬ LÝ CHỈNH SỬA & UPDATE ---
+  // --- 1. LOGIC SỬA THÔNG TIN PET ---
   const handlePickEditImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5, // 👈 Giảm dung lượng ảnh avatar
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.5, 
     });
-    if (!result.canceled) {
-        setEditImageUri(result.assets[0].uri);
-    }
+    if (!result.canceled) setEditImageUri(result.assets[0].uri);
   };
 
   const handleSaveChanges = async () => {
@@ -101,127 +102,126 @@ export default function PetDetailScreen() {
     try {
         const token = await AsyncStorage.getItem('token');
         const formData = new FormData();
-
         formData.append('name', editName);
         formData.append('breed', editBreed);
         formData.append('weight', editWeight);
         formData.append('note', editNote);
         formData.append('category', editCategory ? 'owned' : 'encountered');
-
         if (editImageUri) {
             // @ts-ignore
-            formData.append('image', {
-                uri: editImageUri,
-                type: 'image/jpeg',
-                name: 'update-pet.jpg',
-            });
+            formData.append('image', { uri: editImageUri, type: 'image/jpeg', name: 'update.jpg' });
         }
-
         await axios.put(API_URL, formData, {
-            headers: { 
-                'Content-Type': 'multipart/form-data',
-                Authorization: `Bearer ${token}` 
-            }
+            headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
         });
-
-        Alert.alert("Thành công", "Thông tin đã được cập nhật!");
-        setIsEditing(false);
-        fetchPetDetail(); 
-
-    } catch (error) {
-        Alert.alert("Lỗi", "Không lưu được thay đổi.");
-        console.log(error);
-    } finally {
-        setSaving(false);
-    }
+        Alert.alert("Thành công", "Đã cập nhật!");
+        setIsEditing(false); fetchPetDetail(); 
+    } catch (error) { Alert.alert("Lỗi", "Không lưu được."); } finally { setSaving(false); }
   };
 
-  // --- HÀM GALLERY ---
-  
-  // 👇 1. Hàm chọn ảnh (ĐÃ TỐI ƯU)
+  // --- 2. LOGIC THÊM ẢNH (ADD) ---
   const pickImageForGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, // Cho phép cắt ảnh
-        // quality 0.5 giúp ảnh nhẹ (~100KB-500KB), upload cực nhanh
-        quality: 0.5, 
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.5, 
     });
-
     if (!result.canceled) {
         setSelectedImageUri(result.assets[0].uri);
-        setCaption(''); 
-        setGalleryDate(new Date()); 
-        setModalVisible(true);
+        setCaption(''); setGalleryDate(new Date()); setAddModalVisible(true);
     }
   };
 
-  // 👇 2. Hàm Upload (ĐÃ THÊM LOG LỖI)
   const handleUploadGallery = async () => {
     if (!selectedImageUri) return;
-    
     setUploading(true);
     try {
         const token = await AsyncStorage.getItem('token');
         const formData = new FormData();
-        
         // @ts-ignore
-        formData.append('image', { 
-            uri: selectedImageUri, 
-            type: 'image/jpeg', 
-            name: 'gallery.jpg' 
-        });
-        
+        formData.append('image', { uri: selectedImageUri, type: 'image/jpeg', name: 'gallery.jpg' });
         formData.append('caption', caption);
         formData.append('date', galleryDate.toISOString()); 
-
-        console.log("Đang upload ảnh lên:", `${API_URL}/gallery`); // Debug log
-
         await axios.post(`${API_URL}/gallery`, formData, {
-            headers: { 
-                'Content-Type': 'multipart/form-data', 
-                Authorization: `Bearer ${token}` 
-            }
+            headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
         });
-
-        Alert.alert("Thành công", "Đã thêm vào album!");
-        setModalVisible(false); 
-        fetchPetDetail();
-    } catch (error: any) {
-        console.log("Lỗi upload gallery:", error.response?.data || error.message);
-        Alert.alert("Lỗi", "Không tải ảnh lên được. Kiểm tra mạng hoặc thử ảnh nhỏ hơn.");
-    } finally {
-        setUploading(false);
-    }
+        setAddModalVisible(false); fetchPetDetail();
+    } catch (error) { Alert.alert("Lỗi", "Upload thất bại."); } finally { setUploading(false); }
   };
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) setGalleryDate(selectedDate);
+  // --- 3. LOGIC SỬA/XÓA ITEM GALLERY (EDIT ITEM) ---
+  const openEditGalleryModal = (item: any) => {
+      setCurrentGalleryItem(item);
+      setEditGalleryCaption(item.caption || '');
+      setEditGalleryDate(new Date(item.date));
+      setEditGalleryVisible(true);
   };
 
+  const handleUpdateGalleryItem = async () => {
+      if (!currentGalleryItem) return;
+      setUploading(true);
+      try {
+          const token = await AsyncStorage.getItem('token');
+          await axios.put(`${API_URL}/gallery/${currentGalleryItem._id}`, {
+              caption: editGalleryCaption,
+              date: editGalleryDate.toISOString()
+          }, { headers: { Authorization: `Bearer ${token}` } });
+          
+          setEditGalleryVisible(false);
+          fetchPetDetail();
+      } catch (error) { Alert.alert("Lỗi", "Không cập nhật được ảnh."); } finally { setUploading(false); }
+  };
+
+  const handleDeleteGalleryItem = async () => {
+      if (!currentGalleryItem) return;
+      Alert.alert("Xóa ảnh", "Bạn có chắc muốn xóa ảnh này?", [
+          { text: "Hủy", style: "cancel" },
+          { text: "Xóa", style: "destructive", onPress: async () => {
+              try {
+                  const token = await AsyncStorage.getItem('token');
+                  await axios.delete(`${API_URL}/gallery/${currentGalleryItem._id}`, {
+                      headers: { Authorization: `Bearer ${token}` }
+                  });
+                  setEditGalleryVisible(false);
+                  fetchPetDetail();
+              } catch (error) { Alert.alert("Lỗi", "Không xóa được."); }
+          }}
+      ]);
+  };
+
+  // --- RENDERERS ---
   const renderMedicalRecord = ({ item }: any) => (
-    <View style={styles.timelineItem}>
-        <View style={styles.timelineDot} />
-        <View style={styles.timelineLine} />
-        <View style={styles.recordCard}>
-            <Text style={styles.recordDate}>{new Date(item.date).toLocaleDateString('vi-VN')}</Text>
-            <Text style={styles.recordTitle}>{item.title} ({item.type === 'vaccine' ? '💉' : '🏥'})</Text>
-            {item.description ? <Text style={styles.recordDesc}>{item.description}</Text> : null}
-            {item.img_url ? <Image source={{ uri: item.img_url }} style={styles.recordImg} /> : null}
+    <View style={styles.recordItem}>
+        <View style={styles.recordDateBox}>
+            <Text style={styles.recordDateDay}>{new Date(item.date).getDate()}</Text>
+            <Text style={styles.recordDateMonth}>/{new Date(item.date).getMonth() + 1}</Text>
+        </View>
+        <View style={styles.recordContent}>
+            <View style={{flexDirection:'row', justifyContent:'space-between'}}>
+                <Text style={styles.recordTitle}>{item.title}</Text>
+                <TouchableOpacity onPress={() => router.push({ pathname: '/edit-medical', params: { petId: pet._id, recordId: item._id, oldData: JSON.stringify(item) } } as any)}>
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#999" />
+                </TouchableOpacity>
+            </View>
+            {item.description ? <Text style={styles.recordDesc} numberOfLines={2}>{item.description}</Text> : null}
+            {item.next_appointment ? (
+                <Text style={styles.nextAppt}>⏰ Tái khám: {new Date(item.next_appointment).toLocaleDateString('vi-VN')}</Text>
+            ) : null}
         </View>
     </View>
   );
 
   const renderGalleryItem = ({ item, index }: any) => {
       if (index === 0) return (
-        <TouchableOpacity style={styles.addMomentBtn} onPress={pickImageForGallery}>
-            <Text style={{fontSize: 30, color: '#FF6B81'}}>+</Text>
-            <Text style={{fontSize: 10, color: '#FF6B81', marginTop: 5}}>Thêm ảnh</Text>
+        <TouchableOpacity style={styles.addGalleryBtn} onPress={pickImageForGallery}>
+            <Ionicons name="add" size={24} color="#FF6B81" />
         </TouchableOpacity>
       );
       return (
-          <TouchableOpacity style={styles.galleryCard} onPress={() => { setViewImage(item); setViewModalVisible(true); }}>
+          <TouchableOpacity style={styles.galleryCard} onPress={() => openEditGalleryModal(item)}>
               <Image source={{ uri: item.img_url }} style={styles.galleryImg} />
+              <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.galleryOverlay}>
+                  <Text style={styles.galleryDate}>{new Date(item.date).toLocaleDateString('vi-VN')}</Text>
+                  {item.caption ? <Text numberOfLines={1} style={styles.galleryCaption}>{item.caption}</Text> : null}
+              </LinearGradient>
           </TouchableOpacity>
       );
   };
@@ -229,168 +229,134 @@ export default function PetDetailScreen() {
   if (loading) return <ActivityIndicator size="large" color="#FF8E9E" style={{ marginTop: 50 }} />;
   if (!pet) return <View><Text>Không tìm thấy dữ liệu</Text></View>;
 
+  // === UI CHÍNH ===
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       
-      {/* HEADER */}
-      <View style={styles.headerImageContainer}>
-          <Image source={{ uri: isEditing && editImageUri ? editImageUri : (pet.img_url || 'https://cdn-icons-png.flaticon.com/512/616/616408.png') }} style={styles.headerImage} />
-          <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent']} style={styles.headerOverlay} />
+      {/* HEADER COMPACT */}
+      <View style={styles.header}>
+          <Image source={{ uri: isEditing && editImageUri ? editImageUri : (pet.img_url || 'https://cdn-icons-png.flaticon.com/512/616/616408.png') }} style={styles.headerImg} />
+          <LinearGradient colors={['rgba(0,0,0,0.4)', 'transparent']} style={styles.headerOverlay} />
           
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-             <Ionicons name="arrow-back" size={28} color="#fff" />
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(!isEditing)}>
-             <Ionicons name={isEditing ? "close" : "create-outline"} size={24} color="#fff" />
+          <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditing(!isEditing)}>
+             <Ionicons name={isEditing ? "checkmark" : "create-outline"} size={20} color="#fff" />
           </TouchableOpacity>
-
-          {isEditing && (
-             <TouchableOpacity style={styles.cameraButton} onPress={handlePickEditImage}>
-                 <Ionicons name="camera" size={20} color="#fff" />
-             </TouchableOpacity>
-          )}
+          {isEditing && <TouchableOpacity style={styles.camBtn} onPress={handlePickEditImage}><Ionicons name="camera" size={16} color="#fff" /></TouchableOpacity>}
       </View>
 
-      {/* BODY */}
-      <View style={styles.bodyContainer}>
+      <View style={styles.body}>
         {isEditing ? (
-            // FORM SỬA
             <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.sectionTitle}>Chỉnh sửa thông tin ✏️</Text>
-                
-                <Text style={styles.label}>Tên bé</Text>
-                <TextInput style={styles.input} value={editName} onChangeText={setEditName} />
-
-                <Text style={styles.label}>Giống loài</Text>
-                <TextInput style={styles.input} value={editBreed} onChangeText={setEditBreed} />
-
-                <Text style={styles.label}>Cân nặng (kg)</Text>
-                <TextInput style={styles.input} value={editWeight} onChangeText={setEditWeight} keyboardType="numeric" />
-
-                <Text style={styles.label}>Ghi chú</Text>
-                <TextInput style={[styles.input, styles.textArea]} value={editNote} onChangeText={setEditNote} multiline />
-
-                <View style={styles.switchBox}>
-                    <View style={{flex: 1}}>
-                        <Text style={styles.switchLabel}>Đang nuôi bé này?</Text>
-                        <Text style={styles.switchDesc}>Bật lên để chuyển sang danh sách "Đang nuôi".</Text>
-                    </View>
-                    <Switch 
-                        trackColor={{ false: "#767577", true: "#4CAF50" }}
-                        thumbColor={editCategory ? "#fff" : "#f4f3f4"}
-                        onValueChange={setEditCategory}
-                        value={editCategory}
-                    />
+                <Text style={styles.sectionHeader}>Thông tin cơ bản</Text>
+                <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholder="Tên bé" />
+                <View style={{flexDirection:'row', gap:10}}>
+                    <TextInput style={[styles.input, {flex:1}]} value={editBreed} onChangeText={setEditBreed} placeholder="Giống" />
+                    <TextInput style={[styles.input, {flex:1}]} value={editWeight} onChangeText={setEditWeight} keyboardType="numeric" placeholder="Kg" />
                 </View>
-
+                <TextInput style={[styles.input, {height:60}]} value={editNote} onChangeText={setEditNote} multiline placeholder="Ghi chú" />
+                
+                <View style={styles.switchRow}>
+                    <Text style={styles.switchText}>Đang nuôi</Text>
+                    <Switch trackColor={{ false: "#ccc", true: "#FF9A9E" }} thumbColor={editCategory ? "#FF6B81" : "#f4f3f4"} onValueChange={setEditCategory} value={editCategory} />
+                </View>
+                
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSaveChanges} disabled={saving}>
                     {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>LƯU THAY ĐỔI</Text>}
                 </TouchableOpacity>
-                <View style={{height: 50}}/>
             </ScrollView>
         ) : (
-            // VIEW MODE
             <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.titleRow}>
-                    <Text style={styles.petName}>{pet.name}</Text>
-                    <View style={[styles.badge, {backgroundColor: pet.category === 'owned' ? '#E8F5E9' : '#FFF3E0'}]}>
-                        <Text style={{color: pet.category === 'owned' ? '#4CAF50' : '#FF9800', fontWeight: 'bold', fontSize: 12}}>
-                            {pet.category === 'owned' ? '🏠 Đang nuôi' : '📸 Đã gặp'}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.infoRow}>
-                    <Text style={styles.infoText}>🐾 {pet.species} - {pet.breed || 'Không rõ'}</Text>
-                    {pet.category === 'owned' && <Text style={styles.infoText}>⚖️ {pet.weight || 0} kg</Text>}
-                </View>
-
-                <View style={styles.noteBox}>
-                    <Text style={styles.noteTitle}>📝 Ghi chú:</Text>
-                    <Text style={styles.noteContent}>{pet.note || 'Chưa có ghi chú nào.'}</Text>
+                <View style={styles.titleSection}>
+                    <Text style={styles.name}>{pet.name}</Text>
+                    <Text style={styles.meta}>{pet.species} • {pet.breed || 'Lai'} • {pet.weight || 0}kg</Text>
+                    {pet.note ? <Text style={styles.note}>{pet.note}</Text> : null}
                 </View>
 
                 {pet.category === 'owned' ? (
                     <>
-                        <View style={styles.actionGrid}>
-                            <TouchableOpacity style={styles.actionItem} onPress={() => router.push({ pathname: '/qrcode', params: { id: pet._id, name: pet.name } } as any)}>
-                                <Image source={require('../assets/images/qr.jpg')} style={styles.actionIcon} />
-                                <Text style={styles.actionLabel}>QR Code</Text>
+                        {/* MENU NHANH */}
+                        <View style={styles.menuRow}>
+                            <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/qrcode', params: { id: pet._id, name: pet.name } } as any)}>
+                                <View style={[styles.menuIcon, {backgroundColor:'#E3F2FD'}]}><Ionicons name="qr-code" size={18} color="#2196F3"/></View>
+                                <Text style={styles.menuText}>QR Code</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.actionItem}>
-                                <Ionicons name="nutrition" size={28} color="#FF9A9E" />
-                                <Text style={styles.actionLabel}>Dinh dưỡng</Text>
+                            <TouchableOpacity style={styles.menuItem}>
+                                <View style={[styles.menuIcon, {backgroundColor:'#E8F5E9'}]}><Ionicons name="nutrition" size={18} color="#4CAF50"/></View>
+                                <Text style={styles.menuText}>Ăn uống</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/add-medical', params: { petId: pet._id } } as any)}>
+                                <View style={[styles.menuIcon, {backgroundColor:'#FFF3E0'}]}><Ionicons name="medkit" size={18} color="#FF9800"/></View>
+                                <Text style={styles.menuText}>Sức khỏe</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.sectionTitle}>Hành trình lớn khôn 🌱</Text>
-                        <FlatList 
-                            horizontal data={[{ id: 'add-btn' }, ...(pet.gallery || []).slice().reverse()]}
-                            renderItem={renderGalleryItem} showsHorizontalScrollIndicator={false}
-                            style={{marginBottom: 20}}
-                        />
+                        {/* GALLERY */}
+                        <Text style={styles.sectionHeader}>Hành trình lớn khôn</Text>
+                        <FlatList horizontal data={[{ id: 'add-btn' }, ...(pet.gallery || []).slice().reverse()]} renderItem={renderGalleryItem} showsHorizontalScrollIndicator={false} style={{marginBottom: 15}} />
 
-                        <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-                            <Text style={styles.sectionTitle}>Hồ sơ sức khỏe 🩺</Text>
-                            <TouchableOpacity onPress={() => router.push({ pathname: '/add-medical', params: { petId: pet._id } } as any)}>
-                                <Text style={{color:'#FF6B81', fontWeight:'bold'}}>+ Thêm</Text>
-                            </TouchableOpacity>
-                        </View>
+                        {/* MEDICAL */}
+                        <Text style={styles.sectionHeader}>Lịch sử y tế</Text>
                         <FlatList data={pet.medical_records?.reverse() || []} renderItem={renderMedicalRecord} scrollEnabled={false} />
                     </>
                 ) : (
-                    <View style={styles.encounteredContainer}>
-                        <Text style={styles.encounteredText}>
-                            Bạn đã gặp bé này trên đường. Nếu quyết định nhận nuôi, hãy bấm nút sửa (✏️) và bật "Đang nuôi".
-                        </Text>
-                        <TouchableOpacity style={styles.adoptBtn} onPress={() => setIsEditing(true)}>
-                            <Text style={styles.adoptText}>🏠 TÔI ĐÃ NHẬN NUÔI BÉ!</Text>
-                        </TouchableOpacity>
+                    <View style={styles.adoptBox}>
+                        <Ionicons name="heart" size={40} color="#FF6B81" style={{marginBottom:10}}/>
+                        <Text style={styles.adoptTitle}>Bạn đã gặp bé này!</Text>
+                        <Text style={styles.adoptDesc}>Nếu bạn quyết định nhận nuôi, hãy bấm nút chỉnh sửa (bút chì) ở trên và bật chế độ "Đang nuôi" nhé.</Text>
                     </View>
                 )}
-                <View style={{height: 50}}/>
+                <View style={{height: 40}}/>
             </ScrollView>
         )}
       </View>
 
-      {/* MODAL ADD GALLERY */}
-      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Thêm khoảnh khắc</Text>
-                <Image source={{ uri: selectedImageUri }} style={styles.modalPreviewImg} />
-                
-                <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerBtn}>
-                    <Text>{galleryDate.toLocaleDateString('vi-VN')}</Text>
-                    <Ionicons name="calendar" size={20} color="#FF6B81" />
+      {/* --- MODAL 1: THÊM ẢNH --- */}
+      <Modal animationType="slide" transparent={true} visible={addModalVisible} onRequestClose={() => setAddModalVisible(false)}>
+        <View style={styles.modalBg}>
+            <View style={styles.modalCard}>
+                <Text style={styles.modalHeader}>Thêm ảnh mới</Text>
+                <Image source={{ uri: selectedImageUri }} style={styles.modalImg} />
+                <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateBtn}>
+                    <Text style={styles.dateText}>{galleryDate.toLocaleDateString('vi-VN')}</Text>
+                    <Ionicons name="calendar" size={16} color="#666"/>
                 </TouchableOpacity>
-                {showDatePicker && <DateTimePicker value={galleryDate} mode="date" display="default" onChange={onDateChange} />}
-
-                <TextInput style={styles.modalInput} placeholder="Mô tả..." value={caption} onChangeText={setCaption} />
-                
-                <View style={styles.modalButtons}>
-                    <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.btn, {backgroundColor:'#eee'}]}><Text>Hủy</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={handleUploadGallery} style={[styles.btn, {backgroundColor:'#FF6B81'}]}>
-                        {uploading ? <ActivityIndicator color="#fff"/> : <Text style={{color:'#fff'}}>Lưu</Text>}
-                    </TouchableOpacity>
+                {showDatePicker && <DateTimePicker value={galleryDate} mode="date" onChange={(e, d) => { setShowDatePicker(false); if(d) setGalleryDate(d); }} />}
+                <TextInput style={styles.modalInput} placeholder="Viết chú thích..." value={caption} onChangeText={setCaption} />
+                <View style={styles.modalActions}>
+                    <TouchableOpacity onPress={() => setAddModalVisible(false)}><Text style={styles.cancelText}>Hủy</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={handleUploadGallery}><Text style={styles.confirmText}>Đăng</Text></TouchableOpacity>
                 </View>
             </View>
         </View>
       </Modal>
 
-      {/* MODAL VIEW IMAGE */}
-      <Modal animationType="fade" transparent={true} visible={viewModalVisible} onRequestClose={() => setViewModalVisible(false)}>
-        <View style={styles.viewerContainer}>
-            <TouchableOpacity style={styles.closeViewerBtn} onPress={() => setViewModalVisible(false)}>
-                <Ionicons name="close-circle" size={40} color="#fff" />
-            </TouchableOpacity>
-            {viewImage && (
-                <>
-                    <Image source={{ uri: viewImage.img_url }} style={styles.viewerImg} resizeMode="contain" />
-                    {viewImage.caption ? <Text style={styles.viewerCaption}>{viewImage.caption}</Text> : null}
-                </>
-            )}
+      {/* --- MODAL 2: SỬA/XÓA ẢNH (EDIT ITEM) --- */}
+      <Modal animationType="fade" transparent={true} visible={editGalleryVisible} onRequestClose={() => setEditGalleryVisible(false)}>
+        <View style={styles.modalBg}>
+            <View style={styles.modalCard}>
+                <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
+                    <Text style={styles.modalHeader}>Chi tiết ảnh</Text>
+                    <TouchableOpacity onPress={handleDeleteGalleryItem}><Ionicons name="trash" size={20} color="red"/></TouchableOpacity>
+                </View>
+                
+                {currentGalleryItem && <Image source={{ uri: currentGalleryItem.img_url }} style={styles.modalImg} resizeMode="contain"/>}
+                
+                <TouchableOpacity onPress={() => setShowEditGalleryDatePicker(true)} style={styles.dateBtn}>
+                    <Text style={styles.dateText}>{editGalleryDate.toLocaleDateString('vi-VN')}</Text>
+                    <Ionicons name="calendar" size={16} color="#666"/>
+                </TouchableOpacity>
+                {showEditGalleryDatePicker && <DateTimePicker value={editGalleryDate} mode="date" onChange={(e, d) => { setShowEditGalleryDatePicker(false); if(d) setEditGalleryDate(d); }} />}
+
+                <TextInput style={styles.modalInput} placeholder="Sửa chú thích..." value={editGalleryCaption} onChangeText={setEditGalleryCaption} />
+                
+                <View style={styles.modalActions}>
+                    <TouchableOpacity onPress={() => setEditGalleryVisible(false)}><Text style={styles.cancelText}>Đóng</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={handleUpdateGalleryItem}><Text style={styles.confirmText}>Cập nhật</Text></TouchableOpacity>
+                </View>
+            </View>
         </View>
       </Modal>
 
@@ -399,60 +365,72 @@ export default function PetDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  headerImageContainer: { height: 300, width: '100%', position: 'relative' },
-  headerImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  container: { flex: 1, backgroundColor: '#F8F9FA' }, // Màu nền xám nhạt sang trọng
+  
+  // Header
+  header: { height: 260, width: '100%' },
+  headerImg: { width: '100%', height: '100%' },
   headerOverlay: { ...StyleSheet.absoluteFillObject },
-  backButton: { position: 'absolute', top: 50, left: 20, padding: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 20 },
-  editButton: { position: 'absolute', top: 50, right: 20, padding: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 20 },
-  cameraButton: { position: 'absolute', bottom: 20, right: 20, padding: 12, backgroundColor: '#FF6B81', borderRadius: 25, elevation: 5 },
-  bodyContainer: { flex: 1, backgroundColor: '#fff', marginTop: -30, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  petName: { fontSize: 28, fontWeight: 'bold', color: '#333' },
-  badge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  infoText: { fontSize: 15, color: '#666' },
-  noteBox: { backgroundColor: '#F9F9F9', padding: 15, borderRadius: 12, marginBottom: 20 },
-  noteTitle: { fontWeight: 'bold', color: '#555', marginBottom: 5 },
-  noteContent: { color: '#666', fontStyle: 'italic', lineHeight: 20 },
-  actionGrid: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 25, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 15 },
-  actionItem: { alignItems: 'center' },
-  actionIcon: { width: 35, height: 35, resizeMode: 'contain' },
-  actionLabel: { marginTop: 5, fontSize: 12, color: '#666' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 10, marginTop: 10 },
-  encounteredContainer: { alignItems: 'center', marginTop: 20, padding: 20, backgroundColor: '#FFF3E0', borderRadius: 15 },
-  encounteredText: { textAlign: 'center', color: '#E65100', marginBottom: 15, lineHeight: 22 },
-  adoptBtn: { backgroundColor: '#FF9800', paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, elevation: 3 },
-  adoptText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  addMomentBtn: { width: 100, height: 130, borderRadius: 10, borderWidth: 1, borderColor: '#FF9A9E', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  galleryCard: { width: 100, height: 130, borderRadius: 10, marginRight: 10, overflow: 'hidden' },
+  backBtn: { position: 'absolute', top: 50, left: 20, padding: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 20 },
+  editBtn: { position: 'absolute', top: 50, right: 20, padding: 8, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 20 },
+  camBtn: { position: 'absolute', bottom: 20, right: 20, padding: 10, backgroundColor: '#FF6B81', borderRadius: 20 },
+
+  // Body
+  body: { flex: 1, marginTop: -25, backgroundColor: '#fff', borderTopLeftRadius: 25, borderTopRightRadius: 25, paddingHorizontal: 20, paddingTop: 20 },
+  
+  // View Styles (Compact)
+  titleSection: { marginBottom: 20, alignItems: 'center' },
+  name: { fontSize: 24, fontWeight: 'bold', color: '#333' },
+  meta: { fontSize: 13, color: '#888', marginTop: 4, fontWeight: '500' },
+  note: { fontSize: 13, color: '#666', marginTop: 8, textAlign: 'center', fontStyle: 'italic', paddingHorizontal: 20 },
+
+  // Menu Nhanh
+  menuRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  menuItem: { alignItems: 'center' },
+  menuIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 5 },
+  menuText: { fontSize: 11, color: '#555', fontWeight: '600' },
+
+  sectionHeader: { fontSize: 15, fontWeight: 'bold', color: '#333', marginBottom: 10, marginTop: 5 },
+
+  // Gallery (Nhỏ gọn hơn)
+  addGalleryBtn: { width: 90, height: 110, borderRadius: 12, borderWidth: 1, borderColor: '#FF9A9E', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginRight: 10, backgroundColor: '#FFF5F7' },
+  galleryCard: { width: 90, height: 110, borderRadius: 12, marginRight: 10, overflow: 'hidden', backgroundColor: '#eee' },
   galleryImg: { width: '100%', height: '100%' },
-  timelineItem: { flexDirection: 'row', marginBottom: 15 },
-  timelineDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#FF9A9E', marginTop: 5, zIndex: 1 },
-  timelineLine: { position: 'absolute', left: 5, top: 15, bottom: -15, width: 2, backgroundColor: '#eee' },
-  recordCard: { flex: 1, marginLeft: 15, backgroundColor: '#f9f9f9', padding: 10, borderRadius: 10 },
-  recordDate: { fontSize: 12, color: '#999', fontWeight: 'bold' },
-  recordTitle: { fontSize: 15, fontWeight: 'bold', color: '#333' },
-  recordDesc: { fontSize: 13, color: '#555', marginTop: 2 },
-  recordImg: { width: '100%', height: 120, borderRadius: 8, marginTop: 8 },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#555', marginTop: 15, marginBottom: 5 },
-  input: { backgroundColor: '#F5F5F5', padding: 12, borderRadius: 10, fontSize: 16 },
-  textArea: { height: 80, textAlignVertical: 'top' },
-  saveBtn: { backgroundColor: '#FF6B81', padding: 15, borderRadius: 15, alignItems: 'center', marginTop: 30 },
-  saveText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  switchBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, backgroundColor: '#E8F5E9', padding: 15, borderRadius: 15 },
-  switchLabel: { fontSize: 16, fontWeight: 'bold', color: '#2E7D32' },
-  switchDesc: { fontSize: 12, color: '#4CAF50', marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: '#fff', borderRadius: 20, padding: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 15 },
-  modalPreviewImg: { width: '100%', height: 150, borderRadius: 10, marginBottom: 15 },
-  modalInput: { backgroundColor: '#F5F5F5', padding: 10, borderRadius: 10, marginBottom: 15 },
-  datePickerBtn: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F5F5F5', padding: 10, borderRadius: 10, marginBottom: 15 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end' },
-  btn: { padding: 10, borderRadius: 10, marginLeft: 10, minWidth: 60, alignItems: 'center' },
-  viewerContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
-  closeViewerBtn: { position: 'absolute', top: 40, right: 20, zIndex: 10 },
-  viewerImg: { width: width, height: height * 0.8 },
-  viewerCaption: { color: '#fff', textAlign: 'center', position: 'absolute', bottom: 50, width: '100%' }
+  galleryOverlay: { position: 'absolute', bottom: 0, width: '100%', padding: 6 },
+  galleryDate: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
+  galleryCaption: { color: '#eee', fontSize: 8, fontStyle: 'italic' },
+
+  // Medical Records (Gọn hơn)
+  recordItem: { flexDirection: 'row', marginBottom: 12, backgroundColor: '#fff', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#f0f0f0', shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 3, elevation: 1 },
+  recordDateBox: { width: 40, alignItems: 'center', justifyContent: 'center', borderRightWidth: 1, borderRightColor: '#eee', marginRight: 10 },
+  recordDateDay: { fontSize: 16, fontWeight: 'bold', color: '#FF6B81' },
+  recordDateMonth: { fontSize: 10, color: '#999' },
+  recordContent: { flex: 1 },
+  recordTitle: { fontSize: 14, fontWeight: 'bold', color: '#333' },
+  recordDesc: { fontSize: 12, color: '#666', marginTop: 2 },
+  nextAppt: { fontSize: 11, color: '#FF9800', marginTop: 4, fontWeight: '500' },
+
+  // Edit Form
+  input: { backgroundColor: '#F8F9FA', borderRadius: 10, padding: 10, fontSize: 14, marginBottom: 10, color: '#333' },
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8F9FA', padding: 10, borderRadius: 10, marginBottom: 20 },
+  switchText: { fontSize: 14, fontWeight: '600', color: '#333' },
+  saveBtn: { backgroundColor: '#FF6B81', padding: 12, borderRadius: 10, alignItems: 'center' },
+  saveText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+
+  // Encountered
+  adoptBox: { backgroundColor: '#FFF3E0', padding: 20, borderRadius: 15, alignItems: 'center', marginTop: 10 },
+  adoptTitle: { fontSize: 16, fontWeight: 'bold', color: '#E65100', marginBottom: 5 },
+  adoptDesc: { fontSize: 12, color: '#E65100', textAlign: 'center', lineHeight: 18 },
+
+  // Modals
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalCard: { width: '80%', backgroundColor: '#fff', borderRadius: 20, padding: 20, elevation: 5 },
+  modalHeader: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, textAlign: 'center', color: '#333' },
+  modalImg: { width: '100%', height: 180, borderRadius: 10, marginBottom: 15, backgroundColor: '#eee' },
+  dateBtn: { flexDirection: 'row', justifyContent: 'space-between', padding: 10, backgroundColor: '#F8F9FA', borderRadius: 8, marginBottom: 10 },
+  dateText: { fontSize: 13, color: '#333' },
+  modalInput: { backgroundColor: '#F8F9FA', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 20 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 20 },
+  cancelText: { color: '#999', fontSize: 14, fontWeight: '600' },
+  confirmText: { color: '#FF6B81', fontSize: 14, fontWeight: 'bold' }
 });

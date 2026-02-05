@@ -87,4 +87,41 @@ router.put('/:petId/medical/:recordId', authMiddleware, uploadCloud.single('imag
 // API Xóa bệnh án
 router.delete('/:petId/medical/:recordId', authMiddleware, petController.deleteMedicalRecord);
 
+// --- SỬA THÔNG TIN ẢNH TRONG GALLERY ---
+router.put('/:petId/gallery/:itemId', authMiddleware, async (req, res) => {
+  try {
+      const { petId, itemId } = req.params;
+      const { caption, date } = req.body;
+
+      const pet = await Pet.findOneAndUpdate(
+          { _id: petId, "gallery._id": itemId },
+          { 
+              $set: { 
+                  "gallery.$.caption": caption,
+                  "gallery.$.date": date
+              }
+          },
+          { new: true }
+      );
+      res.json({ success: true, data: pet });
+  } catch (error) {
+      res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// --- XÓA ẢNH KHỎI GALLERY ---
+router.delete('/:petId/gallery/:itemId', authMiddleware, async (req, res) => {
+  try {
+      const { petId, itemId } = req.params;
+      const pet = await Pet.findByIdAndUpdate(
+          petId,
+          { $pull: { gallery: { _id: itemId } } },
+          { new: true }
+      );
+      res.json({ success: true, data: pet });
+  } catch (error) {
+      res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
 module.exports = router;
