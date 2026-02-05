@@ -3,7 +3,6 @@ const Pet = require('../models/Pet.model');
 // 1. Tạo thú cưng mới (POST)
 exports.createPet = async (req, res) => {
     try {
-        // 👇 Đã thêm 'category' vào danh sách nhận dữ liệu
         const { name, species, breed, gender, birthday, weight, note, img_url, category } = req.body;
         const userId = req.userId; 
 
@@ -20,7 +19,6 @@ exports.createPet = async (req, res) => {
             name, species, breed, gender, birthday, weight, note, 
             img_url: finalImgUrl,
             owner: userId,
-            // 👇 Lưu loại thú cưng (Mặc định là 'owned' nếu không gửi lên)
             category: category || 'owned'
         });
 
@@ -38,20 +36,29 @@ exports.createPet = async (req, res) => {
     }
 };
 
-// 2. Lấy danh sách thú cưng (GET)
+// 2. Lấy danh sách thú cưng (GET) - ĐÃ CẬP NHẬT LOGIC LỌC
 exports.getPets = async (req, res) => {
     try {
         const userId = req.userId;
-        
-        // 👇 Nhận query param ?category=... từ URL
         const { category } = req.query;
 
-        // Tạo bộ lọc cơ bản: Phải là của User này
+        // Bộ lọc cơ bản: Của user này
         let filter = { owner: userId };
 
-        // Nếu có gửi category lên thì lọc theo category đó
+        // 👇 LOGIC MỚI: Xử lý cho thú cưng cũ (chưa có category)
         if (category) {
-            filter.category = category;
+            if (category === 'owned') {
+                // Nếu lọc "Đang nuôi" -> Lấy cả 'owned' VÀ những con chưa có category (thú cũ)
+                filter.$or = [
+                    { category: 'owned' },
+                    { category: { $exists: false } }, // Trường category không tồn tại
+                    { category: null },               // Hoặc bằng null
+                    { category: '' }                  // Hoặc rỗng
+                ];
+            } else {
+                // Nếu lọc "Đã gặp" -> Chỉ lấy đúng loại đó
+                filter.category = category;
+            }
         }
 
         const pets = await Pet.find(filter).sort({ createdAt: -1 });
@@ -88,38 +95,37 @@ exports.deletePet = async (req, res) => {
 // 4. CẬP NHẬT THÔNG TIN THÚ CƯNG
 exports.updatePet = async (req, res) => {
     try {
-      // 👇 Thêm 'category' vào đây để cho phép cập nhật trạng thái (Nuôi <-> Gặp)
-      const { name, species, breed, age, weight, gender, note, contact_info, category } = req.body;
-      
-      let updateData = {
-        name, species, breed, note, contact_info,
-        category, // 👈 Lưu category mới vào database
-        age: age ? Number(age) : undefined,
-        weight: weight ? Number(weight) : undefined,
-        gender
-      };
-  
-      if (req.file) {
-        updateData.img_url = req.file.path;
-      }
-  
-      const updatedPet = await Pet.findByIdAndUpdate(
-        req.params.id, 
-        updateData, 
-        { new: true } 
-      );
-  
-      if (!updatedPet) {
-        return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng' });
-      }
-  
-      res.json({ success: true, data: updatedPet });
-  
+        const { name, species, breed, age, weight, gender, note, contact_info, category } = req.body;
+        
+        let updateData = {
+            name, species, breed, note, contact_info,
+            category, 
+            age: age ? Number(age) : undefined,
+            weight: weight ? Number(weight) : undefined,
+            gender
+        };
+    
+        if (req.file) {
+            updateData.img_url = req.file.path;
+        }
+    
+        const updatedPet = await Pet.findByIdAndUpdate(
+            req.params.id, 
+            updateData, 
+            { new: true } 
+        );
+    
+        if (!updatedPet) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy thú cưng' });
+        }
+    
+        res.json({ success: true, data: updatedPet });
+    
     } catch (error) {
-      console.error("Lỗi update pet:", error);
-      res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật' });
+        console.error("Lỗi update pet:", error);
+        res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật' });
     }
-  };
+};
 
 // 5. Thêm hồ sơ sức khỏe (Dự phòng)
 exports.addMedicalRecord = async (req, res) => {
@@ -208,4 +214,4 @@ exports.deleteMedicalRecord = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: 'Lỗi xóa medical: ' + error.message });
     }
-};  
+};
