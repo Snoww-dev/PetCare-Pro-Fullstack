@@ -251,16 +251,17 @@ exports.addWeightRecord = async (req, res) => {
     try {
         const { weight, date, note } = req.body;
         
-        // 1. Tìm và cập nhật mảng lịch sử
-        // 2. Cập nhật luôn field 'weight' hiện tại để hiển thị ở trang chủ
+        // 1. Tìm và cập nhật mảng lịch sử (weight_history)
+        // 2. ĐỒNG THỜI cập nhật luôn field 'weight' (cân nặng hiện tại) để hiển thị ở trang chủ/chi tiết
         const pet = await Pet.findOneAndUpdate(
             { _id: req.params.id, owner: req.userId },
             { 
                 $push: { weight_history: { weight, date, note } },
-                $set: { weight: weight } 
+                $set: { weight: weight }  // 👈 DÒNG QUAN TRỌNG NÀY SẼ UPDATE CÂN NẶNG MỚI NHẤT
             },
             { new: true }
         );
+        
         res.json({ success: true, data: pet });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Lỗi server' });

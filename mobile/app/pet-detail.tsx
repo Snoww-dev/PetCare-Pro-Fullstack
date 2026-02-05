@@ -65,6 +65,7 @@ export default function PetDetailScreen() {
 
   const API_URL = `https://petcare-api-tuyet.onrender.com/api/pets/${params.id}`;
 
+  // 👇 TỰ ĐỘNG CẬP NHẬT KHI QUAY LẠI TỪ TRANG CÂN NẶNG
   useFocusEffect(
     useCallback(() => {
       fetchPetDetail();
@@ -82,7 +83,10 @@ export default function PetDetailScreen() {
       
       setEditName(data.name);
       setEditBreed(data.breed || '');
+      
+      // 👇 Luôn lấy cân nặng mới nhất từ server
       setEditWeight(data.weight ? data.weight.toString() : '');
+      
       setEditNote(data.note || '');
       setEditCategory(data.category === 'owned'); 
 
@@ -93,7 +97,6 @@ export default function PetDetailScreen() {
     }
   };
 
-  // --- 1. LOGIC SỬA THÔNG TIN PET ---
   const handlePickEditImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.5, 
@@ -123,7 +126,6 @@ export default function PetDetailScreen() {
     } catch (error) { Alert.alert("Lỗi", "Không lưu được."); } finally { setSaving(false); }
   };
 
-  // --- 2. LOGIC THÊM ẢNH (ADD) ---
   const pickImageForGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.5, 
@@ -151,7 +153,6 @@ export default function PetDetailScreen() {
     } catch (error) { Alert.alert("Lỗi", "Upload thất bại."); } finally { setUploading(false); }
   };
 
-  // --- 3. LOGIC SỬA/XÓA ITEM GALLERY (EDIT ITEM) ---
   const openEditGalleryModal = (item: any) => {
       setCurrentGalleryItem(item);
       setEditGalleryCaption(item.caption || '');
@@ -278,8 +279,9 @@ export default function PetDetailScreen() {
                 <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholder="Tên bé" />
                 <View style={{flexDirection:'row', gap:10}}>
                     <TextInput style={[styles.input, {flex:1}]} value={editBreed} onChangeText={setEditBreed} placeholder="Giống" />
-                    <TextInput style={[styles.input, {flex:1}]} value={editWeight} onChangeText={setEditWeight} keyboardType="numeric" placeholder="Kg" />
-                </View>
+                    <View style={[styles.input, {flex:1, justifyContent:'center', backgroundColor:'#eee'}]}>
+                        <Text style={{color:'#999'}}>⚖️ {editWeight} kg</Text>
+                    </View>                </View>
                 <TextInput style={[styles.input, {height:60}]} value={editNote} onChangeText={setEditNote} multiline placeholder="Ghi chú" />
                 <View style={styles.switchRow}>
                     <Text style={styles.switchText}>Đang nuôi</Text>
@@ -312,13 +314,8 @@ export default function PetDetailScreen() {
                             </TouchableOpacity>
 
                             {/* 👇 Nút Cân nặng Mới */}
-                            <TouchableOpacity 
-                                style={styles.menuItem} 
-                                onPress={() => router.push({ pathname: '/weight-chart', params: { petId: pet._id } } as any)}
-                            >
-                                <View style={[styles.menuIcon, {backgroundColor:'#F3E5F5'}]}>
-                                    <Ionicons name="scale" size={18} color="#9C27B0"/>
-                                </View>
+                            <TouchableOpacity style={styles.menuItem} onPress={() => router.push({ pathname: '/weight-chart', params: { petId: pet._id } } as any)}>
+                                <View style={[styles.menuIcon, {backgroundColor:'#F3E5F5'}]}><Ionicons name="scale" size={18} color="#9C27B0"/></View>
                                 <Text style={styles.menuText}>Cân nặng</Text>
                             </TouchableOpacity>
 
