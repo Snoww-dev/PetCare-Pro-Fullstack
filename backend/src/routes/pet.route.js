@@ -13,14 +13,10 @@ const Pet = require('../models/Pet.model');
 
 // --- CÁC ROUTE CƠ BẢN ---
 
-// 👇 QUAN TRỌNG: ĐÃ SỬA - Thêm uploadCloud.single('image') để nhận ảnh và FormData khi tạo Pet
 router.post('/', authMiddleware, uploadCloud.single('image'), petController.createPet); 
-
-router.get('/', authMiddleware, petController.getPets);    
+router.get('/', authMiddleware, petController.getPets);     
 router.get('/:id', authMiddleware, petController.getPet);
 router.delete('/:id', authMiddleware, petController.deletePet); 
-
-// 👇 Route sửa thông tin Pet (Cũng cần uploadCloud để nhận ảnh mới nếu có)
 router.put('/:id', authMiddleware, uploadCloud.single('image'), petController.updatePet); 
 
 // --- ROUTE THÊM HỒ SƠ Y TẾ (CÓ ẢNH) ---
@@ -123,5 +119,9 @@ router.delete('/:petId/gallery/:itemId', authMiddleware, async (req, res) => {
       res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
+
+// --- 👇 MỚI: ROUTES CHO CHỨC NĂNG ĂN UỐNG (DIET) ---
+router.post('/:id/diet', authMiddleware, petController.addDietPlan);
+router.delete('/:petId/diet/:dietId', authMiddleware, petController.deleteDietPlan);
 
 module.exports = router;

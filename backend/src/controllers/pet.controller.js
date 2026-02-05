@@ -36,7 +36,7 @@ exports.createPet = async (req, res) => {
     }
 };
 
-// 2. Lấy danh sách thú cưng (GET) - ĐÃ CẬP NHẬT LOGIC LỌC
+// 2. Lấy danh sách thú cưng (GET)
 exports.getPets = async (req, res) => {
     try {
         const userId = req.userId;
@@ -45,18 +45,16 @@ exports.getPets = async (req, res) => {
         // Bộ lọc cơ bản: Của user này
         let filter = { owner: userId };
 
-        // 👇 LOGIC MỚI: Xử lý cho thú cưng cũ (chưa có category)
+        // Xử lý cho thú cưng cũ (chưa có category)
         if (category) {
             if (category === 'owned') {
-                // Nếu lọc "Đang nuôi" -> Lấy cả 'owned' VÀ những con chưa có category (thú cũ)
                 filter.$or = [
                     { category: 'owned' },
-                    { category: { $exists: false } }, // Trường category không tồn tại
-                    { category: null },               // Hoặc bằng null
-                    { category: '' }                  // Hoặc rỗng
+                    { category: { $exists: false } }, 
+                    { category: null },              
+                    { category: '' }                 
                 ];
             } else {
-                // Nếu lọc "Đã gặp" -> Chỉ lấy đúng loại đó
                 filter.category = category;
             }
         }
@@ -127,7 +125,7 @@ exports.updatePet = async (req, res) => {
     }
 };
 
-// 5. Thêm hồ sơ sức khỏe (Dự phòng)
+// 5. Thêm hồ sơ sức khỏe
 exports.addMedicalRecord = async (req, res) => {
     try {
         const { date, type, title, description, doctor } = req.body;
@@ -213,5 +211,37 @@ exports.deleteMedicalRecord = async (req, res) => {
         res.json({ success: true, message: 'Đã xóa hồ sơ!' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Lỗi xóa medical: ' + error.message });
+    }
+};
+
+// --- 👇 MỚI: QUẢN LÝ ĂN UỐNG (DIET) ---
+
+// 9. Thêm lịch ăn
+exports.addDietPlan = async (req, res) => {
+    try {
+        const { time, title, food, amount, note } = req.body;
+        const pet = await Pet.findOneAndUpdate(
+            { _id: req.params.id, owner: req.userId },
+            { $push: { diet_plans: { time, title, food, amount, note } } },
+            { new: true }
+        );
+        res.json({ success: true, data: pet });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
+// 10. Xóa lịch ăn
+exports.deleteDietPlan = async (req, res) => {
+    try {
+        const { petId, dietId } = req.params;
+        const pet = await Pet.findOneAndUpdate(
+            { _id: petId, owner: req.userId },
+            { $pull: { diet_plans: { _id: dietId } } },
+            { new: true }
+        );
+        res.json({ success: true, data: pet });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };

@@ -15,27 +15,25 @@ const petSchema = new mongoose.Schema({
     img_url: { type: String }, 
     note: { type: String },
 
-    // 👇 THÊM MỚI: Phân loại thú cưng
-    // 'owned': Đang nuôi (Có đầy đủ thông tin y tế)
-    // 'encountered': Gặp trên đường (Chỉ lưu ảnh làm kỷ niệm)
+    // Phân loại thú cưng
     category: { 
         type: String, 
         enum: ['owned', 'encountered'], 
         default: 'owned' 
     },
 
-    // 👇 Mảng chứa bộ sưu tập ảnh (Growth Timeline)
+    // Bộ sưu tập ảnh (Growth Timeline)
     gallery: [
         {
             img_url: { type: String, required: true },
             date: { type: Date, default: Date.now },
-            caption: { type: String } // Ví dụ: "Lần đầu đi tắm", "Sinh nhật 1 tuổi"
+            caption: { type: String }
         }
     ],
 
     contact_info: { type: String, default: "Xin hãy gọi cho chủ nhân của tôi!" },
     
-    // 👇 Hồ sơ y tế
+    // Hồ sơ y tế
     medical_records: [
         {
             date: { type: String }, 
@@ -45,6 +43,17 @@ const petSchema = new mongoose.Schema({
             doctor: { type: String },
             img_url: { type: String }, 
             next_appointment: { type: String } 
+        }
+    ],
+
+    // 👇 MỚI: Kế hoạch ăn uống (Diet Plans)
+    diet_plans: [
+        {
+            time: { type: String, required: true }, // VD: "07:00"
+            title: { type: String, required: true }, // VD: "Bữa sáng"
+            food: { type: String }, // VD: "Hạt Royal Canin"
+            amount: { type: String }, // VD: "50g"
+            note: { type: String }
         }
     ]
 
