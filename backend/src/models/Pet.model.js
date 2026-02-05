@@ -15,7 +15,16 @@ const petSchema = new mongoose.Schema({
     img_url: { type: String }, 
     note: { type: String },
 
-    // 👇 THÊM MỚI: Mảng chứa bộ sưu tập ảnh (Growth Timeline)
+    // 👇 THÊM MỚI: Phân loại thú cưng
+    // 'owned': Đang nuôi (Có đầy đủ thông tin y tế)
+    // 'encountered': Gặp trên đường (Chỉ lưu ảnh làm kỷ niệm)
+    category: { 
+        type: String, 
+        enum: ['owned', 'encountered'], 
+        default: 'owned' 
+    },
+
+    // 👇 Mảng chứa bộ sưu tập ảnh (Growth Timeline)
     gallery: [
         {
             img_url: { type: String, required: true },
@@ -26,20 +35,15 @@ const petSchema = new mongoose.Schema({
 
     contact_info: { type: String, default: "Xin hãy gọi cho chủ nhân của tôi!" },
     
-    // 👇 ĐÃ SỬA LẠI TÊN BIẾN THÀNH 'medical_records' (cho khớp với Route)
+    // 👇 Hồ sơ y tế
     medical_records: [
         {
-            date: { type: String }, // Đổi sang String để dễ lưu dạng YYYY-MM-DD từ App gửi lên
-            type: { type: String, default: 'medical' }, // Bỏ Enum cứng nhắc để tránh lỗi, mặc định là medical
+            date: { type: String }, 
+            type: { type: String, default: 'medical' }, 
             title: { type: String, required: true },
             description: { type: String },
             doctor: { type: String },
-            
-            // 👇 Chỗ để lưu link ảnh X-quang/Đơn thuốc. 
-            // ⚠️ QUAN TRỌNG: Nhớ có dấu phẩy ở cuối dòng này nhé
             img_url: { type: String }, 
-
-            // 👇 Dòng bạn mới thêm để lưu ngày tái khám
             next_appointment: { type: String } 
         }
     ]

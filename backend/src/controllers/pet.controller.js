@@ -3,16 +3,25 @@ const Pet = require('../models/Pet.model');
 // 1. Tạo thú cưng mới (POST)
 exports.createPet = async (req, res) => {
     try {
-        const { name, species, breed, gender, birthday, weight, note, img_url } = req.body;
+        // 👇 Đã thêm 'category' vào danh sách nhận dữ liệu
+        const { name, species, breed, gender, birthday, weight, note, img_url, category } = req.body;
         const userId = req.userId; 
 
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Không xác định được người dùng!' });
         }
 
+        let finalImgUrl = img_url || '';
+        if (req.file) {
+            finalImgUrl = req.file.path;
+        }
+
         const newPet = new Pet({
-            name, species, breed, gender, birthday, weight, note, img_url,
-            owner: userId 
+            name, species, breed, gender, birthday, weight, note, 
+            img_url: finalImgUrl,
+            owner: userId,
+            // 👇 Lưu loại thú cưng (Mặc định là 'owned' nếu không gửi lên)
+            category: category || 'owned'
         });
 
         await newPet.save();
@@ -32,8 +41,20 @@ exports.createPet = async (req, res) => {
 // 2. Lấy danh sách thú cưng (GET)
 exports.getPets = async (req, res) => {
     try {
-        const userId = req.userId; 
-        const pets = await Pet.find({ owner: userId }).sort({ createdAt: -1 });
+        const userId = req.userId;
+        
+        // 👇 Nhận query param ?category=... từ URL
+        const { category } = req.query;
+
+        // Tạo bộ lọc cơ bản: Phải là của User này
+        let filter = { owner: userId };
+
+        // Nếu có gửi category lên thì lọc theo category đó
+        if (category) {
+            filter.category = category;
+        }
+
+        const pets = await Pet.find(filter).sort({ createdAt: -1 });
 
         res.json({
             success: true,
@@ -64,35 +85,26 @@ exports.deletePet = async (req, res) => {
     }
 };
 
-// 👇 4. CẬP NHẬT THÔNG TIN THÚ CƯNG (ĐÃ SỬA ĐỂ LƯU CONTACT_INFO)
+// 4. CẬP NHẬT THÔNG TIN THÚ CƯNG
 exports.updatePet = async (req, res) => {
   try {
-    // Lấy thông tin từ form gửi lên
     const { name, species, breed, age, weight, gender, note, contact_info } = req.body;
     
-    // Tạo đối tượng chứa dữ liệu cần sửa
     let updateData = {
-      name,
-      species,
-      breed,
-      note,
-      contact_info, // 👈 ĐÃ THÊM DÒNG NÀY ĐỂ LƯU THÔNG TIN LIÊN HỆ QR
-      age: age ? Number(age) : undefined, // Chỉ update nếu có giá trị
+      name, species, breed, note, contact_info,
+      age: age ? Number(age) : undefined,
       weight: weight ? Number(weight) : undefined,
       gender
     };
 
-    // 👇 LOGIC ẢNH: Nếu người dùng có chọn ảnh mới (req.file tồn tại) thì mới cập nhật link ảnh
-    // Còn nếu không chọn ảnh mới thì GIỮ NGUYÊN ảnh cũ
     if (req.file) {
       updateData.img_url = req.file.path;
     }
 
-    // Tìm và update (Dùng findByIdAndUpdate cho gọn)
     const updatedPet = await Pet.findByIdAndUpdate(
       req.params.id, 
       updateData, 
-      { new: true } // Trả về dữ liệu mới sau khi sửa
+      { new: true } 
     );
 
     if (!updatedPet) {
@@ -107,14 +119,11 @@ exports.updatePet = async (req, res) => {
   }
 };
 
-// 5. Thêm hồ sơ sức khỏe
-// ⚠️ Lưu ý: Hiện tại chức năng này đã được xử lý trực tiếp bên file 'pet.route.js' để nhận ảnh.
-// Hàm dưới đây chỉ để dự phòng hoặc cho các API cũ không có ảnh.
+// 5. Thêm hồ sơ sức khỏe (Dự phòng)
 exports.addMedicalRecord = async (req, res) => {
     try {
         const { date, type, title, description, doctor } = req.body;
 
-        // Mình sửa thành medical_records (có gạch dưới) để khớp với Model mới nhất của bạn
         const pet = await Pet.findOneAndUpdate(
             { _id: req.params.id, owner: req.userId },
             { 
@@ -152,19 +161,16 @@ exports.getPet = async (req, res) => {
 exports.updateMedicalRecord = async (req, res) => {
     try {
         const { petId, recordId } = req.params;
-        const { date, title, description, doctor, next_appointment } = req.body; // Thêm next_appointment
+        const { date, title, description, doctor, next_appointment } = req.body; 
 
-        // Tạo object chứa dữ liệu cần sửa
-        // Lưu ý: MongoDB update trong mảng dùng cú pháp "medical_records.$.field"
         let updateFields = {
             "medical_records.$.date": date,
             "medical_records.$.title": title,
             "medical_records.$.description": description,
             "medical_records.$.doctor": doctor,
-            "medical_records.$.next_appointment": next_appointment // 👈 Logic mới: Ngày tái khám
+            "medical_records.$.next_appointment": next_appointment 
         };
 
-        // Nếu có up ảnh mới thì sửa luôn ảnh
         if (req.file) {
             updateFields["medical_records.$.img_url"] = req.file.path;
         }
@@ -190,7 +196,7 @@ exports.deleteMedicalRecord = async (req, res) => {
 
         const pet = await Pet.findOneAndUpdate(
             { _id: petId, owner: req.userId },
-            { $pull: { medical_records: { _id: recordId } } }, // $pull là lệnh xóa phần tử khỏi mảng
+            { $pull: { medical_records: { _id: recordId } } }, 
             { new: true }
         );
 
