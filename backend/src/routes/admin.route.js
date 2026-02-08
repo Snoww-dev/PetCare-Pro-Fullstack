@@ -44,24 +44,22 @@ router.get('/users-stats', async (req, res) => {
     }
 });
 
-// 2. 👇 API MỚI: ADMIN TẠO USER
+// 2. API MỚI: ADMIN TẠO USER (Đã sửa lỗi display_name)
 router.post('/create-user', async (req, res) => {
     try {
+        // 👇 SỬA Ở ĐÂY: Nhận 'name' từ frontend nhưng gán vào biến temp
         const { name, email, password } = req.body;
 
-        // Kiểm tra xem email đã có chưa
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ success: false, message: "Email này đã tồn tại!" });
         }
 
-        // Mã hóa mật khẩu (Bắt buộc)
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Tạo user mới
         const newUser = new User({
-            name,
+            display_name: name, // 👈 QUAN TRỌNG: Gán 'name' vào trường 'display_name' của Database
             email,
             password: hashedPassword
         });
@@ -72,7 +70,7 @@ router.post('/create-user', async (req, res) => {
 
     } catch (error) {
         console.error("Lỗi tạo user:", error);
-        res.status(500).json({ success: false, message: "Lỗi Server khi tạo User" });
+        res.status(500).json({ success: false, message: "Lỗi Server: " + error.message });
     }
 });
 
