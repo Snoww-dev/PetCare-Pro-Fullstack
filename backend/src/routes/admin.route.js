@@ -44,12 +44,13 @@ router.get('/users-stats', async (req, res) => {
     }
 });
 
-// 2. API MỚI: ADMIN TẠO USER (Đã sửa lỗi display_name)
+// 2. API MỚI: ADMIN TẠO USER (Đã sửa lỗi display_name & Thêm bắt lỗi trùng Email)
 router.post('/create-user', async (req, res) => {
     try {
         // 👇 SỬA Ở ĐÂY: Nhận 'name' từ frontend nhưng gán vào biến temp
         const { name, email, password } = req.body;
 
+        // Kiểm tra thủ công lần 1
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ success: false, message: "Email này đã tồn tại!" });
@@ -70,6 +71,12 @@ router.post('/create-user', async (req, res) => {
 
     } catch (error) {
         console.error("Lỗi tạo user:", error);
+
+        // 👇 ĐOẠN MỚI THÊM: Nếu MongoDB báo lỗi trùng lặp (code 11000)
+        if (error.code === 11000) {
+             return res.status(400).json({ success: false, message: "Email này đã được sử dụng rồi!" });
+        }
+        
         res.status(500).json({ success: false, message: "Lỗi Server: " + error.message });
     }
 });
