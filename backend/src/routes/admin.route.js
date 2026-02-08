@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User.model'); // Nhớ đảm bảo đúng đường dẫn model
+const User = require('../models/User.model'); 
 const Pet = require('../models/Pet.model');
-const bcrypt = require('bcryptjs'); // 👇 Dùng để mã hóa mật khẩu
+const bcrypt = require('bcryptjs'); 
 
-// 1. API LẤY THỐNG KÊ (Giữ nguyên, nhưng bỏ trường password đi cho bảo mật)
+// 1. API LẤY THỐNG KÊ (Đã thêm trường role và sửa mapping name)
 router.get('/users-stats', async (req, res) => {
     try {
         const users = await User.aggregate([
@@ -19,9 +19,10 @@ router.get('/users-stats', async (req, res) => {
             {
                 $project: {
                     _id: 1,
-                    name: 1,
+                    // 👇 SỬA QUAN TRỌNG: Map trường 'display_name' trong DB sang 'name' cho Frontend dùng
+                    name: "$display_name", 
                     email: 1,
-                    // password: 1,  <-- ĐÃ XÓA DÒNG NÀY ĐỂ BẢO MẬT
+                    role: 1, // 👈 THÊM DÒNG NÀY: Để lấy chức vụ (admin/user)
                     createdAt: 1,
                     petCount: { $size: "$pet_list" }
                 }
@@ -44,13 +45,11 @@ router.get('/users-stats', async (req, res) => {
     }
 });
 
-// 2. API MỚI: ADMIN TẠO USER (Đã sửa lỗi display_name & Thêm bắt lỗi trùng Email)
+// 2. API TẠO USER (Giữ nguyên logic cũ + set mặc định role user)
 router.post('/create-user', async (req, res) => {
     try {
-        // 👇 SỬA Ở ĐÂY: Nhận 'name' từ frontend nhưng gán vào biến temp
         const { name, email, password } = req.body;
 
-        // Kiểm tra thủ công lần 1
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ success: false, message: "Email này đã tồn tại!" });
@@ -60,24 +59,36 @@ router.post('/create-user', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newUser = new User({
-            display_name: name, // 👈 QUAN TRỌNG: Gán 'name' vào trường 'display_name' của Database
+            display_name: name, 
             email,
-            password: hashedPassword
+            password: hashedPassword,
+            role: 'user' // 👇 Mặc định tạo mới là user thường
         });
 
         await newUser.save();
-
         res.json({ success: true, message: "Tạo tài khoản thành công! 🎉" });
 
     } catch (error) {
         console.error("Lỗi tạo user:", error);
-
-        // 👇 ĐOẠN MỚI THÊM: Nếu MongoDB báo lỗi trùng lặp (code 11000)
         if (error.code === 11000) {
              return res.status(400).json({ success: false, message: "Email này đã được sử dụng rồi!" });
         }
-        
         res.status(500).json({ success: false, message: "Lỗi Server: " + error.message });
+    }
+});
+
+// 3. 👇 API MỚI: CẬP NHẬT QUYỀN (THĂNG CHỨC/GIÁNG CHỨC)
+router.put('/update-role', async (req, res) => {
+    try {
+        const { userId, newRole } = req.body; // newRole sẽ là 'admin' hoặc 'user'
+
+        // Tìm user và cập nhật trường role
+        await User.findByIdAndUpdate(userId, { role: newRole });
+
+        res.json({ success: true, message: "Cập nhật quyền thành công!" });
+    } catch (error) {
+        console.error("Lỗi update role:", error);
+        res.status(500).json({ success: false, message: "Lỗi Server khi cập nhật quyền" });
     }
 });
 

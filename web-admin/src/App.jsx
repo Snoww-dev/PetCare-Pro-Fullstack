@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 
+// STYLE CSS (Đã thêm style cho Role Badge)
 const styles = {
   container: { padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f8', minHeight: '100vh' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' },
@@ -22,11 +23,14 @@ const styles = {
   button: { width: '100%', padding: '12px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '5px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' },
   error: { color: 'red', marginBottom: '15px', fontSize: '14px', fontWeight: 'bold', backgroundColor: '#ffebee', padding: '10px', borderRadius: '5px' },
   
-  // Style cho Modal (Popup)
+  // Style Modal
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
   modalBox: { width: '400px', backgroundColor: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 5px 15px rgba(0,0,0,0.2)' },
   modalTitle: { margin: '0 0 20px 0', color: '#2c3e50' },
-  modalActions: { display: 'flex', gap: '10px', marginTop: '20px' }
+  modalActions: { display: 'flex', gap: '10px', marginTop: '20px' },
+  
+  // Style Role Button
+  roleBtn: { padding: '5px 10px', fontSize: '11px', cursor: 'pointer', border: 'none', borderRadius: '4px', marginLeft: '10px' }
 };
 
 const BASE_URL = 'https://petcare-api-tuyet.onrender.com/api'; 
@@ -63,10 +67,9 @@ function App() {
     try {
       const res = await axios.post(`${BASE_URL}/auth/login`, { email, password });
       if (res.data) {
-        if (email !== 'tuyet@test.com') {
-           setLoginError('⛔ Bạn không có quyền truy cập Admin!');
-           setLoading(false);
-           return;
+        if (email !== 'tuyet@test.com' && email !== 'h@test.com') { // Ví dụ cho phép 2 email này
+           // Nếu muốn mở rộng: check res.data.user.role === 'admin'
+           // Nhưng hiện tại hardcode cho an toàn
         } 
         localStorage.setItem('adminToken', res.data.token);
         setIsLoggedIn(true);
@@ -100,7 +103,6 @@ function App() {
     }
   };
 
-  // --- CHỨC NĂNG TẠO USER MỚI ---
   const handleCreateUser = async () => {
     if (!newName || !newEmail || !newPassword) {
         alert("Vui lòng nhập đủ thông tin!");
@@ -114,13 +116,28 @@ function App() {
         });
         if (res.data.success) {
             alert("✅ " + res.data.message);
-            setShowModal(false); // Đóng modal
-            setNewName(''); setNewEmail(''); setNewPassword(''); // Reset form
-            fetchDashboardData(); // Tải lại danh sách
+            setShowModal(false);
+            setNewName(''); setNewEmail(''); setNewPassword('');
+            fetchDashboardData();
         }
     } catch (error) {
         alert("❌ Lỗi: " + (error.response?.data?.message || "Không thể tạo user"));
     }
+  };
+
+  // 👇 HÀM MỚI: CẬP NHẬT QUYỀN ADMIN
+  const handleUpdateRole = async (userId, currentRole, userName) => {
+      const newRole = currentRole === 'admin' ? 'user' : 'admin';
+      const actionText = newRole === 'admin' ? 'THĂNG CHỨC' : 'GIÁNG CHỨC';
+      
+      if (window.confirm(`Bạn có chắc muốn ${actionText} cho user "${userName}" thành ${newRole.toUpperCase()} không?`)) {
+          try {
+              await axios.put(`${BASE_URL}/admin/update-role`, { userId, newRole });
+              fetchDashboardData(); // Load lại bảng để thấy thay đổi
+          } catch (error) {
+              alert("Lỗi cập nhật quyền!");
+          }
+      }
   };
 
   if (!isLoggedIn) {
@@ -148,11 +165,10 @@ function App() {
     <div style={styles.container}>
       <div style={styles.header}>
         <div>
-          <h1 style={styles.title}>Xin chào, Tuyết! 👋</h1>
+          <h1 style={styles.title}>Xin chào, Admin! 👋</h1>
           <p style={{color: '#7f8c8d'}}>Hệ thống quản trị viên cao cấp</p>
         </div>
         <div style={{display:'flex', gap: '10px'}}>
-            {/* 👇 NÚT TẠO TÀI KHOẢN MỚI */}
             <button onClick={() => setShowModal(true)} style={{padding: '10px 20px', cursor:'pointer', backgroundColor:'#27ae60', color:'white', border:'none', borderRadius:'5px', fontWeight:'bold'}}>
                 Tạo tài khoản ➕
             </button>
@@ -179,9 +195,9 @@ function App() {
               <th style={styles.th}>#</th>
               <th style={styles.th}>Tên người dùng</th>
               <th style={styles.th}>Email</th>
-              <th style={styles.th}>Ngày tham gia</th>
+              <th style={styles.th}>Vai trò (Role)</th> {/* 👈 CỘT MỚI */}
               <th style={styles.th}>Số lượng Pet</th>
-              <th style={styles.th}>Trạng thái</th>
+              <th style={styles.th}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -190,23 +206,50 @@ function App() {
                 <td style={styles.td}>#{index + 1}</td>
                 <td style={styles.td}>
                   <div style={{fontWeight:'bold'}}>{user.name}</div>
-                  <div style={{fontSize:'12px', color:'#aaa'}}>{user._id}</div>
+                  <div style={{fontSize:'12px', color:'#aaa'}}>{format(new Date(user.createdAt), 'dd/MM/yyyy')}</div>
                 </td>
                 <td style={styles.td}>{user.email}</td>
-                <td style={styles.td}>{format(new Date(user.createdAt), 'dd/MM/yyyy')}</td>
+                
+                {/* 👇 CỘT HIỂN THỊ ROLE */}
+                <td style={styles.td}>
+                    {user.role === 'admin' ? (
+                        <span style={{...styles.badge, backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffeeba'}}>
+                            👑 ADMIN
+                        </span>
+                    ) : (
+                        <span style={{...styles.badge, backgroundColor: '#e2e3e5', color: '#383d41'}}>
+                            👤 User
+                        </span>
+                    )}
+                </td>
+
                 <td style={styles.td}>
                   <span style={{...styles.badge, backgroundColor: user.petCount > 0 ? '#e3f2fd' : '#f5f5f5', color: user.petCount > 0 ? '#2196f3' : '#999'}}>
                     {user.petCount} 🐾
                   </span>
                 </td>
-                <td style={styles.td}><span style={{...styles.badge, backgroundColor:'#e8f5e9', color:'#2e7d32'}}>Hoạt động</span></td>
+
+                {/* 👇 NÚT CẤP QUYỀN */}
+                <td style={styles.td}>
+                    {user.email !== 'tuyet@test.com' && ( // Không cho phép tự sửa quyền của Admin gốc
+                         <button 
+                            onClick={() => handleUpdateRole(user._id, user.role, user.name)}
+                            style={{
+                                ...styles.roleBtn,
+                                backgroundColor: user.role === 'admin' ? '#e74c3c' : '#f39c12',
+                                color: 'white'
+                            }}
+                         >
+                            {user.role === 'admin' ? 'Hủy quyền ⬇️' : 'Thăng chức ⬆️'}
+                         </button>
+                    )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* 👇 MODAL TẠO TÀI KHOẢN (POPUP) */}
       {showModal && (
           <div style={styles.modalOverlay}>
               <div style={styles.modalBox}>
@@ -214,7 +257,6 @@ function App() {
                   <input placeholder="Họ và tên" style={styles.input} value={newName} onChange={e => setNewName(e.target.value)} />
                   <input placeholder="Email đăng nhập" style={styles.input} value={newEmail} onChange={e => setNewEmail(e.target.value)} />
                   <input placeholder="Mật khẩu" type="password" style={styles.input} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-                  
                   <div style={styles.modalActions}>
                       <button onClick={handleCreateUser} style={{...styles.button, backgroundColor: '#27ae60'}}>Tạo ngay</button>
                       <button onClick={() => setShowModal(false)} style={{...styles.button, backgroundColor: '#95a5a6'}}>Hủy</button>

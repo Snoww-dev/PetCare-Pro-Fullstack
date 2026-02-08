@@ -1,8 +1,7 @@
 const mongoose = require('mongoose');
 
-// Dựa trên bảng "customers" trong bản vẽ của bạn
 const UserSchema = new mongoose.Schema({
-    display_name: {  // Thay cho username
+    display_name: {  // Tên hiển thị
         type: String,
         required: true,
         trim: true
@@ -14,24 +13,26 @@ const UserSchema = new mongoose.Schema({
         trim: true,
         lowercase: true
     },
-    password: { // Trong DB của bạn là hash_password
+    password: { // Mật khẩu đã mã hóa
         type: String,
         required: true,
         minlength: 6
     },
-    phone: { // Thêm trường số điện thoại như thiết kế
+    phone: { // Số điện thoại (giữ lại để App Mobile dùng)
         type: String,
         default: ''
     },
-    img_url: { // Avatar người dùng
+    img_url: { // Avatar (giữ lại để App Mobile dùng)
         type: String,
-        default: 'https://via.placeholder.com/150' // Ảnh mặc định nếu họ chưa up
+        default: 'https://via.placeholder.com/150'
     },
-    role: { // Gộp bảng "admin" vào đây luôn cho gọn
+    
+    // 👇 QUAN TRỌNG: Phần phân quyền
+    role: { 
         type: String,
-        enum: ['user', 'admin', 'staff'], 
-        default: 'user'
+        enum: ['user', 'admin', 'staff'], // Hỗ trợ cả: Người dùng, Admin, Nhân viên
+        default: 'user' // Mặc định tạo mới là User thường
     }
-}, { timestamps: true }); // Tự động có created_at, updated_at
+}, { timestamps: true }); // Tự động tạo createdAt và updatedAt
 
 module.exports = mongoose.model('User', UserSchema);
