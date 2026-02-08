@@ -10,7 +10,6 @@ const Pet = require('./src/models/Pet.model.js');
 const authRoutes = require('./src/routes/auth.route');
 const petRoutes = require('./src/routes/pet.route');
 const uploadRoutes = require('./src/routes/upload.route'); 
-// 👇 ĐÃ SỬA: Import User Route (Thêm src/ vào đường dẫn và đưa lên đây)
 const userRoutes = require('./src/routes/user.route');
 
 // 2. Khởi tạo ứng dụng Express
@@ -27,8 +26,11 @@ app.use(cors());
 app.use('/api/auth', authRoutes);       
 app.use('/api/pets', petRoutes);        
 app.use('/api/upload', uploadRoutes);   
-// 👇 ĐÃ SỬA: Kích hoạt Route User tại đây
 app.use('/api/users', userRoutes);
+
+// 👇 ĐÃ THÊM: Route Admin (Đường dẫn chính xác tới folder src)
+app.use('/api/admin', require('./src/routes/admin.route'));
+
 
 // 👇 === 5. ROUTE TÌM TRẺ LẠC ===
 // Route công khai: Hiển thị thông tin Pet dưới dạng trang Web HTML

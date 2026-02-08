@@ -26,7 +26,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Thay đổi URL này thành URL backend của bạn
-  const API_URL = 'http://localhost:5000/api/admin/users-stats'; 
+  const API_URL = 'https://petcare-api-tuyet.onrender.com/api/admin/users-stats'; 
 
   useEffect(() => {
     fetchData();
