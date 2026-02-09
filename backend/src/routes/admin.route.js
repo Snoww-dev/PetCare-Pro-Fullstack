@@ -4,7 +4,7 @@ const User = require('../models/User.model');
 const Pet = require('../models/Pet.model');
 const bcrypt = require('bcryptjs'); 
 
-// 1. API LẤY THỐNG KÊ (Đã thêm trường role và sửa mapping name)
+// 1. API LẤY THỐNG KÊ (Đã thêm lấy ảnh đại diện)
 router.get('/users-stats', async (req, res) => {
     try {
         const users = await User.aggregate([
@@ -19,10 +19,11 @@ router.get('/users-stats', async (req, res) => {
             {
                 $project: {
                     _id: 1,
-                    // 👇 SỬA QUAN TRỌNG: Map trường 'display_name' trong DB sang 'name' cho Frontend dùng
+                    // Map trường 'display_name' sang 'name' cho Frontend dễ dùng
                     name: "$display_name", 
                     email: 1,
-                    role: 1, // 👈 THÊM DÒNG NÀY: Để lấy chức vụ (admin/user)
+                    role: 1, 
+                    img_url: 1, // 👈 QUAN TRỌNG: Thêm dòng này để lấy link ảnh
                     createdAt: 1,
                     petCount: { $size: "$pet_list" }
                 }
@@ -45,7 +46,7 @@ router.get('/users-stats', async (req, res) => {
     }
 });
 
-// 2. API TẠO USER (Giữ nguyên logic cũ + set mặc định role user)
+// 2. API TẠO USER (Giữ nguyên)
 router.post('/create-user', async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -62,7 +63,7 @@ router.post('/create-user', async (req, res) => {
             display_name: name, 
             email,
             password: hashedPassword,
-            role: 'user' // 👇 Mặc định tạo mới là user thường
+            role: 'user' // Mặc định tạo mới là user thường
         });
 
         await newUser.save();
@@ -77,7 +78,7 @@ router.post('/create-user', async (req, res) => {
     }
 });
 
-// 3. 👇 API MỚI: CẬP NHẬT QUYỀN (THĂNG CHỨC/GIÁNG CHỨC)
+// 3. API CẬP NHẬT QUYỀN (Giữ nguyên)
 router.put('/update-role', async (req, res) => {
     try {
         const { userId, newRole } = req.body; // newRole sẽ là 'admin' hoặc 'user'

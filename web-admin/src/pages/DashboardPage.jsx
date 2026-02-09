@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Table, Card, Statistic, Button, Tag, Space, Modal, Form, Input, message, ConfigProvider } from 'antd';
-import { UserOutlined, LogoutOutlined, ReloadOutlined, PlusOutlined, CrownFilled } from '@ant-design/icons';
+import { Layout, Table, Card, Statistic, Button, Tag, Space, Modal, Form, Input, message, ConfigProvider, Avatar } from 'antd'; // 👈 Đã thêm Avatar
+import { UserOutlined, LogoutOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -77,6 +77,12 @@ const DashboardPage = () => {
 
   // Cấu hình các cột cho Bảng (Table)
   const columns = [
+    { 
+        title: 'Avatar', 
+        dataIndex: 'img_url', 
+        key: 'avatar',
+        render: (url) => <Avatar src={url} icon={<UserOutlined />} size="large" style={{border: '2px solid #ff69b4'}} />
+    },
     { title: 'Tên người dùng', dataIndex: 'name', key: 'name', render: (text) => <b>{text}</b> },
     { title: 'Email', dataIndex: 'email', key: 'email' },
     { 
@@ -89,7 +95,7 @@ const DashboardPage = () => {
       title: 'Vai trò', 
       key: 'role',
       render: (_, record) => {
-        const isBoss = record.email === 'tuyet@test.com'; // Đặc quyền BOSS
+        const isBoss = record.email === 'tuyet@test.com'; 
         if (isBoss || record.role === 'admin') {
             return <Tag color="gold" style={{ padding: '5px 10px', borderRadius: 10 }}>👑 ADMIN</Tag>;
         }
@@ -107,7 +113,7 @@ const DashboardPage = () => {
       key: 'action',
       render: (_, record) => {
         const isBoss = record.email === 'tuyet@test.com';
-        if (isBoss) return null; // Không hiện nút thao tác với Boss
+        if (isBoss) return null; 
         return (
           <Button 
             size="small" 
@@ -135,7 +141,6 @@ const DashboardPage = () => {
         </Header>
         
         <Content style={{ margin: '24px 40px' }}>
-          {/* 3 Thẻ thống kê */}
           <Space size="large" style={{ display: 'flex', marginBottom: 24, width: '100%' }}>
             <Card style={{ flex: 1, textAlign: 'center', borderRadius: 15 }} hoverable>
               <Statistic title="Tổng Users" value={stats.totalUsers} prefix={<UserOutlined />} valueStyle={{ color: '#ff69b4' }} />
@@ -148,19 +153,17 @@ const DashboardPage = () => {
             </Card>
           </Space>
 
-          {/* Bảng dữ liệu chính */}
           <Card style={{ borderRadius: 15, boxShadow: '0 5px 20px rgba(0,0,0,0.05)' }}>
              <Table 
                 columns={columns} 
                 dataSource={users} 
                 rowKey="_id" 
                 loading={loading}
-                pagination={{ pageSize: 5 }} // Tự động phân trang 5 dòng/trang
+                pagination={{ pageSize: 5 }} 
              />
           </Card>
         </Content>
 
-        {/* Modal Tạo User */}
         <Modal title="Tạo tài khoản mới ✨" open={isModalOpen} onCancel={() => setIsModalOpen(false)} footer={null}>
           <Form form={form} onFinish={handleCreateUser} layout="vertical">
             <Form.Item name="name" label="Họ tên" rules={[{ required: true }]}> <Input /> </Form.Item>
