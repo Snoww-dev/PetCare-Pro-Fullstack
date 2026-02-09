@@ -25,13 +25,13 @@ export default function EditProfileScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState(''); 
   
-  // 👇 SỬA LỖI Ở ĐÂY: Thêm <string | null> để TypeScript hiểu
+  // 👇 Đã sửa: Thêm <string | null> để TypeScript không báo lỗi
   const [avatar, setAvatar] = useState<string | null>(null); 
   const [newAvatarUri, setNewAvatarUri] = useState<string | null>(null); 
   
   const [loading, setLoading] = useState(false);
 
-  // 👇 LINK API: Đảm bảo đúng link server Render của bạn
+  // Link API
   const API_URL = 'https://petcare-api-tuyet.onrender.com/api/users/me';
 
   useEffect(() => {
@@ -96,11 +96,14 @@ export default function EditProfileScreen() {
         }
 
         // --- GỌI API LÊN SERVER ---
+        // ⚠️ QUAN TRỌNG: KHÔNG tự set 'Content-Type': 'multipart/form-data'
+        // Axios sẽ tự động làm việc này kèm theo boundary chính xác.
         const response = await axios.put(API_URL, formData, {
             headers: { 
-                'Content-Type': 'multipart/form-data', 
-                Authorization: `Bearer ${token}` 
-            }
+                Authorization: `Bearer ${token}`,
+                'Accept': 'application/json',
+            },
+            timeout: 15000, // Thêm timeout 15s để tránh treo app
         });
 
         // --- NẾU THÀNH CÔNG ---
@@ -116,9 +119,24 @@ export default function EditProfileScreen() {
             router.back(); 
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.log("Lỗi upload:", error);
-        Alert.alert("Lỗi", "Không thể cập nhật. Kiểm tra mạng hoặc thử lại sau.");
+        
+        // 👇 HIỂN THỊ LỖI CHI TIẾT ĐỂ DỄ DEBUG
+        let errorMessage = "Không thể cập nhật.";
+        
+        if (error.response) {
+            // Server trả về lỗi (400, 401, 500...)
+            errorMessage = error.response.data.message || `Lỗi Server (${error.response.status})`;
+        } else if (error.request) {
+            // Không nhận được phản hồi (do mạng hoặc Server ngủ)
+            errorMessage = "Server không phản hồi. Vui lòng kiểm tra mạng hoặc thử lại sau 1 phút.";
+        } else {
+            // Lỗi code
+            errorMessage = error.message;
+        }
+
+        Alert.alert("Lỗi", errorMessage);
     } finally {
         setLoading(false);
     }

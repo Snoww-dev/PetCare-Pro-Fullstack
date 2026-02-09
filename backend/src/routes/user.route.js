@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
+const User = require('../models/User.model');
 const authMiddleware = require('../middlewares/auth.middleware');
 const userController = require('../controllers/user.controller');
-const User = require('../models/User.model');
 const jwt = require('jsonwebtoken');
 
-// 👇 1. KHAI BÁO THƯ VIỆN UPLOAD ẢNH TRỰC TIẾP TẠI ĐÂY
+// 👇 1. KHAI BÁO THƯ VIỆN & CẤU HÌNH NGAY TẠI ĐÂY (Để tránh lỗi không tìm thấy file)
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-// 👇 2. CẤU HÌNH CLOUDINARY (Gộp vào đây cho chắc chắn)
+// Cấu hình Cloudinary (Thông tin của bạn)
 cloudinary.config({
   cloud_name: 'dn4dwjot',
   api_key: '621559651451135',
@@ -26,7 +26,6 @@ const storage = new CloudinaryStorage({
 });
 
 const uploadCloud = multer({ storage });
-
 // ---------------------------------------------------------
 
 // API lấy thông tin: GET /api/users/me
@@ -35,29 +34,26 @@ router.get('/me', authMiddleware, userController.getMe);
 // API cập nhật: PUT /api/users/me (Có upload ảnh)
 router.put('/me', authMiddleware, uploadCloud.single('image'), async (req, res) => {
     try {
-        // Lấy ID user từ token
         const userId = req.user.id || req.user._id;
         const { display_name, phone } = req.body;
 
         const currentUser = await User.findById(userId);
-        if (!currentUser) {
-            return res.status(404).json({ success: false, message: "Không tìm thấy User!" });
-        }
+        if (!currentUser) return res.status(404).json({ success: false, message: "User not found" });
 
-        // Cập nhật thông tin text
+        // Cập nhật tên & sđt
         if (display_name) currentUser.display_name = display_name;
         if (phone) currentUser.phone = phone;
 
-        // Cập nhật ảnh (Nếu có gửi lên)
+        // Cập nhật ảnh (Nếu có)
         if (req.file) {
-            currentUser.img_url = req.file.path; // Link ảnh từ Cloudinary
+            currentUser.img_url = req.file.path;
         }
 
         await currentUser.save();
 
         res.json({
             success: true,
-            message: "Cập nhật thành công! 🎉",
+            message: "Update successful",
             data: {
                 _id: currentUser._id,
                 name: currentUser.display_name,
@@ -66,10 +62,9 @@ router.put('/me', authMiddleware, uploadCloud.single('image'), async (req, res) 
                 phone: currentUser.phone
             }
         });
-
     } catch (error) {
-        console.error("Lỗi update profile:", error);
-        res.status(500).json({ success: false, message: "Lỗi Server: " + error.message });
+        console.error("Lỗi update:", error);
+        res.status(500).json({ success: false, message: "Server Error: " + error.message });
     }
 });
 
