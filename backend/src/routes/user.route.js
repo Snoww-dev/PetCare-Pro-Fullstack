@@ -1,9 +1,10 @@
-import Router from 'express';
-import { authMe } from '../controllers/user.controller.js';
-import { protectedRoute } from '../middlewares/auth.middleware.js';
+import { Router } from 'express';
+import { authMe, changePassword, getStaffOptions } from '../controllers/user.controller.js';
 
 const router = Router();
 
-router.get('/me', protectedRoute, authMe);
+router.get('/me', authMe);
+router.get('/staff-options', getStaffOptions);
+router.post('/change-password', changePassword);
 
 export default router;

@@ -1,8 +1,8 @@
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 
 import { connectDB } from "./src/configs/database.js";
-import User from "./src/models/user.model.js";
+import User from "./src/models/users.model.js";
 
 dotenv.config();
 
@@ -32,6 +32,7 @@ const createSuperAdmin = async () => {
             full_name: "Super Admin",
             phone: "1234567890",
             address: "123 Admin St, Admin City, Admin Country",
+            role: "admin",
             is_active: true,
             last_login: new Date(),
         });
